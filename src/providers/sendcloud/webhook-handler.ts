@@ -1,9 +1,6 @@
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils";
 import type { Logger, MedusaContainer } from "@medusajs/framework/types";
-import {
-  markOrderFulfillmentAsDeliveredWorkflow,
-  updateFulfillmentWorkflow,
-} from "@medusajs/medusa/core-flows";
+import { updateFulfillmentWorkflow } from "@medusajs/medusa/core-flows";
 
 import type { SendCloudPluginOptions } from "../../types/plugin-options";
 import type { SendcloudWebhookPayload } from "../../types/sendcloud-api";
@@ -162,6 +159,7 @@ const handleParcelStatusChanged = async (
     id: string;
     data: Record<string, unknown>;
     metadata?: Record<string, unknown>;
+    delivered_at?: Date;
   } = {
     id: fulfillment.id,
     data: nextData,
@@ -181,13 +179,16 @@ const handleParcelStatusChanged = async (
     };
   }
 
-  await updateFulfillmentWorkflow(container).run({ input: update });
-
   if (parcel?.status?.id === STATUS_DELIVERED && !fulfillment.delivered_at) {
-    await markOrderFulfillmentAsDeliveredWorkflow(container).run({
-      input: { orderId: "", fulfillmentId: fulfillment.id },
-    });
+    // Mark the fulfillment itself delivered. Order-level delivered status
+    // sync via markOrderFulfillmentAsDeliveredWorkflow needs an orderId
+    // we don't have at webhook time (FulfillmentDTO has no order_id, and
+    // reverse-resolving it via query.graph requires a link traversal
+    // parked for a future cycle).
+    update.delivered_at = new Date();
   }
+
+  await updateFulfillmentWorkflow(container).run({ input: update });
 
   return { status: 200, message: "processed" };
 };

@@ -4,14 +4,10 @@ import { processSendcloudWebhook } from "../webhook-handler";
 import { verifySendcloudSignature } from "../helpers";
 
 const updateFulfillmentRun = jest.fn(async (_args: unknown) => ({}));
-const markDeliveredRun = jest.fn(async (_args: unknown) => ({}));
 
 jest.mock("@medusajs/medusa/core-flows", () => ({
   updateFulfillmentWorkflow: jest.fn(() => ({
     run: (args: unknown) => updateFulfillmentRun(args),
-  })),
-  markOrderFulfillmentAsDeliveredWorkflow: jest.fn(() => ({
-    run: (args: unknown) => markDeliveredRun(args),
   })),
 }));
 
@@ -95,7 +91,6 @@ describe("verifySendcloudSignature", () => {
 describe("processSendcloudWebhook", () => {
   beforeEach(() => {
     updateFulfillmentRun.mockClear();
-    markDeliveredRun.mockClear();
     loggerStub.debug.mockClear();
   });
 
@@ -182,10 +177,9 @@ describe("processSendcloudWebhook", () => {
         },
       },
     });
-    expect(markDeliveredRun).not.toHaveBeenCalled();
   });
 
-  it("invokes markOrderFulfillmentAsDeliveredWorkflow when status.id === 11", async () => {
+  it("sets delivered_at on the fulfillment when status.id === 11", async () => {
     const fulfillment = {
       id: "ful_2",
       data: { sendcloud_parcel_id: 777 },
@@ -209,12 +203,13 @@ describe("processSendcloudWebhook", () => {
       payload,
     });
 
-    expect(markDeliveredRun).toHaveBeenCalledWith({
-      input: expect.objectContaining({ fulfillmentId: "ful_2" }),
-    });
+    const call = updateFulfillmentRun.mock.calls[0]?.[0] as {
+      input: { delivered_at?: Date };
+    };
+    expect(call.input.delivered_at).toBeInstanceOf(Date);
   });
 
-  it("skips delivered workflow when fulfillment.delivered_at is already set", async () => {
+  it("does not set delivered_at when fulfillment.delivered_at is already set", async () => {
     const fulfillment = {
       id: "ful_3",
       data: { sendcloud_parcel_id: 42 },
@@ -234,7 +229,10 @@ describe("processSendcloudWebhook", () => {
       payload,
     });
 
-    expect(markDeliveredRun).not.toHaveBeenCalled();
+    const call = updateFulfillmentRun.mock.calls[0]?.[0] as {
+      input: { delivered_at?: Date };
+    };
+    expect(call.input.delivered_at).toBeUndefined();
   });
 
   it("flags sendcloud_exception metadata when status.id === 80", async () => {

@@ -36,7 +36,7 @@ The route sits behind the `preserveRawBody: true` middleware declared since cycl
      },
    }
    ```
-5. **status.id === 11 (delivered):** also calls `markOrderFulfillmentAsDeliveredWorkflow` when the fulfillment hasn't already been marked delivered.
+5. **status.id === 11 (delivered):** sets `fulfillment.delivered_at = new Date()` on the same `updateFulfillmentWorkflow` call when the fulfillment isn't already marked delivered. Order-level delivered-state sync via `markOrderFulfillmentAsDeliveredWorkflow` is deferred — that workflow requires an `orderId` that `FulfillmentDTO` doesn't expose directly (tracked in NOTES.md).
 6. **status.id === 80 (exception):** sets `fulfillment.metadata.sendcloud_exception = { timestamp, message }` in the same workflow call for admin visibility.
 
 Other status ids persist as-is on `fulfillment.data.status`. No Medusa-side side effect.

@@ -72,6 +72,10 @@ The route resolves the fulfillment provider by its Medusa-convention key `fp_{id
 
 SendCloud retries up to 10× with exponential backoff (5min → 1h). We don't implement our own queue — failed processing results in a non-2xx response that SendCloud retries. Document for ops.
 
+### Order-level delivered status sync
+
+`parcel_status_changed` with status.id 11 currently sets `fulfillment.delivered_at` directly via `updateFulfillmentWorkflow`, but does **not** invoke `markOrderFulfillmentAsDeliveredWorkflow` because that workflow requires `orderId` — and `FulfillmentDTO` has no direct `order_id` field, so we'd need either a reverse `query.graph` link traversal (order → shipping_methods → fulfillments) or to stash `order_id` on `fulfillment.data` at `createFulfillment` time. Deferred. Medusa may still auto-propagate the delivered fulfillment to the order status via its own subscribers; worth verifying in production.
+
 ---
 
 ## Resolved in cycle 07 (2026-04-12)
