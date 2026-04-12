@@ -367,7 +367,297 @@ describe("SendCloudFulfillmentProvider", () => {
     });
   });
 
+  describe("calculatePrice", () => {
+    type CalculatePriceContext = Parameters<
+      SendCloudFulfillmentProvider["calculatePrice"]
+    >[2];
+
+    const optionData = {
+      sendcloud_code: sampleOption.code,
+    };
+
+    const methodData = {} as Parameters<
+      SendCloudFulfillmentProvider["calculatePrice"]
+    >[1];
+
+    const buildItem = (
+      overrides: {
+        weight?: number;
+        length?: number;
+        width?: number;
+        height?: number;
+        quantity?: number;
+      } = {}
+    ) =>
+      ({
+        quantity: overrides.quantity ?? 1,
+        variant: {
+          id: "var_1",
+          weight: overrides.weight ?? 500,
+          length: overrides.length ?? 10,
+          width: overrides.width ?? 10,
+          height: overrides.height ?? 10,
+          material: "",
+          product: { id: "prod_1" },
+        },
+        product: {
+          id: "prod_1",
+          collection_id: "",
+          categories: [],
+          tags: [],
+        },
+      }) as unknown as CalculatePriceContext["items"][number];
+
+    const buildContext = (
+      overrides: Partial<{
+        fromCountry?: string;
+        toCountry?: string;
+        toPostal?: string;
+        items: CalculatePriceContext["items"];
+      }> = {}
+    ): CalculatePriceContext =>
+      ({
+        id: "cart_1",
+        shipping_address: {
+          country_code: overrides.toCountry ?? "NL",
+          postal_code: overrides.toPostal ?? "1012AB",
+        } as unknown as CalculatePriceContext["shipping_address"],
+        items: overrides.items ?? [buildItem()],
+        ...(overrides.fromCountry !== undefined
+          ? {
+              from_location: {
+                address: { country_code: overrides.fromCountry },
+              },
+            }
+          : {}),
+      }) as unknown as CalculatePriceContext;
+
+    const quoteResponse = {
+      data: [
+        {
+          ...sampleOption,
+          quotes: [
+            {
+              weight: {
+                min: { value: "0.001", unit: "kg" },
+                max: { value: "23.000", unit: "kg" },
+              },
+              price: {
+                breakdown: [
+                  {
+                    type: "price_without_insurance",
+                    label: "Label",
+                    price: { value: "15.50", currency: "EUR" },
+                  },
+                ],
+                total: { value: "17.50", currency: "EUR" },
+              },
+              lead_time: 24,
+            },
+          ],
+        },
+      ],
+      message: null,
+    };
+
+    const buildProvider = (
+      extra: Partial<
+        ConstructorParameters<typeof SendCloudFulfillmentProvider>[1]
+      > = {}
+    ) =>
+      new SendCloudFulfillmentProvider(
+        { logger: noopLogger },
+        { ...validOptions, retryBaseDelayMs: 0, ...extra }
+      );
+
+    it("returns SendCloud's quote total and marks it tax-exclusive", async () => {
+      let capturedBody: Record<string, unknown> | undefined;
+      nock(BASE)
+        .post(PATH, (body) => {
+          capturedBody = body as Record<string, unknown>;
+          return true;
+        })
+        .reply(200, quoteResponse);
+
+      const result = await buildProvider().calculatePrice(
+        optionData,
+        methodData,
+        buildContext({ fromCountry: "FR" })
+      );
+
+      expect(result).toEqual({
+        calculated_amount: 17.5,
+        is_calculated_price_tax_inclusive: false,
+      });
+      expect(capturedBody).toMatchObject({
+        shipping_option_code: sampleOption.code,
+        from_country_code: "FR",
+        to_country_code: "NL",
+        to_postal_code: "1012AB",
+        calculate_quotes: true,
+      });
+      const parcels = (capturedBody as { parcels: unknown[] }).parcels;
+      expect(parcels).toHaveLength(1);
+    });
+
+    it("falls back to defaultFromCountryCode when from_location is absent", async () => {
+      let capturedBody: Record<string, unknown> | undefined;
+      nock(BASE)
+        .post(PATH, (body) => {
+          capturedBody = body as Record<string, unknown>;
+          return true;
+        })
+        .reply(200, quoteResponse);
+
+      const provider = buildProvider({ defaultFromCountryCode: "BE" });
+
+      await provider.calculatePrice(optionData, methodData, buildContext({}));
+
+      expect(capturedBody).toMatchObject({ from_country_code: "BE" });
+    });
+
+    it("throws INVALID_DATA when shipping_address.country_code is missing", async () => {
+      await expect(
+        buildProvider().calculatePrice(
+          optionData,
+          methodData,
+          buildContext({ toCountry: "" })
+        )
+      ).rejects.toMatchObject({
+        type: MedusaError.Types.INVALID_DATA,
+        message: expect.stringMatching(/country_code/),
+      });
+    });
+
+    it("throws INVALID_DATA when neither from_location nor defaultFromCountryCode is set", async () => {
+      await expect(
+        buildProvider().calculatePrice(optionData, methodData, buildContext({}))
+      ).rejects.toMatchObject({
+        type: MedusaError.Types.INVALID_DATA,
+        message: expect.stringMatching(/defaultFromCountryCode|from_location/),
+      });
+    });
+
+    it("throws INVALID_DATA when cart has no weight and no volume", async () => {
+      const emptyItem = buildItem({
+        weight: 0,
+        length: 0,
+        width: 0,
+        height: 0,
+      });
+
+      await expect(
+        buildProvider().calculatePrice(
+          optionData,
+          methodData,
+          buildContext({ fromCountry: "FR", items: [emptyItem] })
+        )
+      ).rejects.toMatchObject({
+        type: MedusaError.Types.INVALID_DATA,
+        message: expect.stringMatching(/weight|dimensions/i),
+      });
+    });
+
+    it("throws UNEXPECTED_STATE when SendCloud returns an empty data array", async () => {
+      nock(BASE).post(PATH).reply(200, { data: [], message: "no match" });
+
+      await expect(
+        buildProvider().calculatePrice(
+          optionData,
+          methodData,
+          buildContext({ fromCountry: "FR" })
+        )
+      ).rejects.toMatchObject({
+        type: MedusaError.Types.UNEXPECTED_STATE,
+      });
+    });
+
+    it("throws UNEXPECTED_STATE when the first option has no quotes", async () => {
+      nock(BASE)
+        .post(PATH)
+        .reply(200, {
+          data: [{ ...sampleOption, quotes: [] }],
+          message: null,
+        });
+
+      await expect(
+        buildProvider().calculatePrice(
+          optionData,
+          methodData,
+          buildContext({ fromCountry: "FR" })
+        )
+      ).rejects.toMatchObject({
+        type: MedusaError.Types.UNEXPECTED_STATE,
+      });
+    });
+
+    it("converts variant.weight to kg according to weightUnit", async () => {
+      let capturedBody: Record<string, unknown> | undefined;
+      nock(BASE)
+        .post(PATH, (body) => {
+          capturedBody = body as Record<string, unknown>;
+          return true;
+        })
+        .reply(200, quoteResponse);
+
+      const provider = buildProvider({ weightUnit: "kg" });
+      const item = buildItem({
+        weight: 2,
+        quantity: 3,
+        length: 10,
+        width: 10,
+        height: 10,
+      });
+
+      await provider.calculatePrice(
+        optionData,
+        methodData,
+        buildContext({ fromCountry: "FR", items: [item] })
+      );
+
+      const parcel = (
+        capturedBody as { parcels: Array<Record<string, unknown>> }
+      ).parcels[0];
+      expect(parcel.weight).toEqual({ value: "6.000", unit: "kg" });
+    });
+
+    it("derives a cubic bounding box from summed item volumes", async () => {
+      let capturedBody: Record<string, unknown> | undefined;
+      nock(BASE)
+        .post(PATH, (body) => {
+          capturedBody = body as Record<string, unknown>;
+          return true;
+        })
+        .reply(200, quoteResponse);
+
+      const item = buildItem({
+        length: 10,
+        width: 10,
+        height: 10,
+        quantity: 9,
+      });
+
+      await buildProvider().calculatePrice(
+        optionData,
+        methodData,
+        buildContext({ fromCountry: "FR", items: [item] })
+      );
+
+      const parcel = (
+        capturedBody as { parcels: Array<Record<string, unknown>> }
+      ).parcels[0];
+      const dimensions = parcel.dimensions as Record<string, string>;
+      const expectedSide = Math.cbrt(9000).toFixed(2);
+      expect(dimensions).toEqual({
+        length: expectedSide,
+        width: expectedSide,
+        height: expectedSide,
+        unit: "cm",
+      });
+    });
+  });
+
   describe("next cycle", () => {
-    it.todo("returns quote price for calculatePrice — §3.4");
+    it.todo("createFulfillment — §3.6");
   });
 });

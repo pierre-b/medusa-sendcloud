@@ -51,6 +51,24 @@ export type SendCloudRequirements = {
 
 export type SendCloudChargingType = "first_scan" | "label_creation";
 
+export type SendCloudShippingQuotePriceBreakdownEntry = {
+  type: string;
+  label: string;
+  price: SendCloudPrice;
+};
+
+export type SendCloudShippingQuote = {
+  weight?: {
+    min?: SendCloudWeight;
+    max?: SendCloudWeight;
+  };
+  price: {
+    breakdown: SendCloudShippingQuotePriceBreakdownEntry[];
+    total: SendCloudPrice;
+  };
+  lead_time?: number | null;
+};
+
 export type SendCloudShippingOption = {
   code: string;
   name: string;
@@ -66,7 +84,7 @@ export type SendCloudShippingOption = {
   contract?: SendCloudContract;
   requirements: SendCloudRequirements;
   charging_type: SendCloudChargingType;
-  quotes?: unknown[] | null;
+  quotes?: SendCloudShippingQuote[] | null;
 };
 
 export type SendCloudShippingOptionsFilter = {

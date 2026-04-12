@@ -18,4 +18,8 @@ export type SendCloudPluginOptions = {
   baseUrl?: string;
   maxRetries?: number;
   retryBaseDelayMs?: number;
+  defaultFromCountryCode?: string;
+  weightUnit?: SendCloudWeightUnitOption;
 };
+
+export type SendCloudWeightUnitOption = "g" | "kg" | "lbs" | "oz";

@@ -34,6 +34,22 @@ Spec §3.3 also wants `validateFulfillmentData` to verify the cart total weight 
 
 ---
 
+## Added in cycle 03 (calculatePrice, 2026-04-12)
+
+### Multi-parcel splitting
+
+`calculatePrice` aggregates the whole cart into a single parcel (summed weight + cubic bounding box). For heavy or large orders this will under-quote vs. SendCloud's actual multi-collo pricing. Spec §8 covers multicollo — its own cycle once we have a strategy for per-parcel weight/dimension assignments.
+
+### Currency assumption
+
+SendCloud quotes in EUR by default (and the shipping-options snapshot only lists EUR/GBP/USD in the `SendCloudPrice` currency enum). `calculatePrice` returns `Number(value)` without currency conversion; non-EUR stores will see prices in EUR units despite whatever the store currency is. Until we have an FX source, document that the plugin is EUR-first.
+
+### Tax-inclusive quotes
+
+`is_calculated_price_tax_inclusive` is hardcoded `false`. B2B stores running SendCloud quotes tax-inclusive will need a `pricesIncludeTax` plugin option — add when a customer asks.
+
+---
+
 ## Still parked
 
 ### `noopLogger` test helper duplication
