@@ -50,11 +50,43 @@ SendCloud quotes in EUR by default (and the shipping-options snapshot only lists
 
 ---
 
+## Added in cycle 07 (webhook parcel_status_changed + refund_requested, 2026-04-12)
+
+### Integration-lifecycle events log-and-ignore
+
+`integration_connected`, `integration_deleted`, `integration_modified` all return 200 with a debug log. No Medusa-side action. Park until a concrete need (e.g. surface in an admin dashboard) emerges.
+
+### No admin notification channel for exceptions
+
+Status id 80 writes `metadata.sendcloud_exception` but nothing notifies an admin live. A dedicated channel (email, slack, admin widget) is a future cycle.
+
+### No event deduplication store
+
+Relies on timestamp ordering (`fulfillment.data.status_updated_at`) to drop stale SendCloud retries. If two webhooks share an identical timestamp and arrive out of order, behaviour is undefined. Low-probability; add a processed-id store later if it becomes a real failure mode.
+
+### `fp_sendcloud_sendcloud` container key assumption
+
+The route resolves the fulfillment provider by its Medusa-convention key `fp_{identifier}_{id}` to read plugin options. If Medusa changes container-registration naming across versions, route breaks. Short-term fine; if it flickers, introduce a module loader that publishes `sendcloudPluginOptions` under a stable container key.
+
+### Webhook retry policy
+
+SendCloud retries up to 10× with exponential backoff (5min → 1h). We don't implement our own queue — failed processing results in a non-2xx response that SendCloud retries. Document for ops.
+
+---
+
+## Resolved in cycle 07 (2026-04-12)
+
+### ✅ Tracking number / URL for shipments AND returns
+
+Previously parked in cycle 04 and cycle 06. Webhook now populates `fulfillment.data.tracking_number`, `tracking_url`, and `status` via `updateFulfillmentWorkflow` on each `parcel_status_changed` event. Returns share the same parcel-id path so return tracking lands identically.
+
+---
+
 ## Added in cycle 06 (createReturnFulfillment, 2026-04-12)
 
-### Tracking number / URL for returns arrive via webhook
+### ~~Tracking number / URL for returns arrive via webhook~~
 
-`POST /api/v3/returns/announce-synchronously` response only gives `{ return_id, parcel_id, multi_collo_ids }` — no tracking info. `fulfillment.data.tracking_number` and `tracking_url` stay `null` until spec §4's `parcel_status_changed` webhook lands. `labels[0]` is emitted with empty-string tracking fields so Medusa's `FulfillmentLabel.tracking_number: string` typing holds; real values populate on the first webhook.
+✅ Resolved in cycle 07. See above.
 
 ### Multi-collo returns
 

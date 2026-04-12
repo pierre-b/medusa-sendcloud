@@ -21,6 +21,7 @@ export type SendCloudPluginOptions = {
   defaultFromCountryCode?: string;
   weightUnit?: SendCloudWeightUnitOption;
   defaultExportReason?: SendCloudExportReasonOption;
+  webhookLookbackDays?: number;
 };
 
 export type SendCloudWeightUnitOption = "g" | "kg" | "lbs" | "oz";

@@ -1,3 +1,5 @@
+import crypto from "node:crypto";
+
 import { MedusaError } from "@medusajs/framework/utils";
 import type {
   CalculateShippingOptionPriceDTO,
@@ -14,6 +16,30 @@ import type {
   SendCloudVariantCustomsEntry,
   SendCloudVariantsMap,
 } from "../../types/sendcloud-api";
+
+export const verifySendcloudSignature = (
+  rawBody: Buffer | string,
+  signatureHeader: string,
+  secret: string
+): boolean => {
+  if (!signatureHeader || !secret) return false;
+  const bodyBuffer =
+    typeof rawBody === "string" ? Buffer.from(rawBody, "utf8") : rawBody;
+  const digestHex = crypto
+    .createHmac("sha256", secret)
+    .update(bodyBuffer)
+    .digest("hex");
+
+  // Guard against invalid hex in the signature header — Buffer.from with
+  // non-hex characters produces a shorter buffer which would otherwise
+  // sneak past the length compare.
+  if (!/^[0-9a-f]+$/i.test(signatureHeader)) return false;
+
+  const providedBuf = Buffer.from(signatureHeader.toLowerCase(), "hex");
+  const computedBuf = Buffer.from(digestHex, "hex");
+  if (providedBuf.length !== computedBuf.length) return false;
+  return crypto.timingSafeEqual(providedBuf, computedBuf);
+};
 
 export const readSendCloudCode = (data: Record<string, unknown>): string => {
   const code = data.sendcloud_code;

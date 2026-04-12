@@ -261,6 +261,34 @@ export type SendCloudShipmentCancelResponse = {
   };
 };
 
+export type SendcloudWebhookParcelStatus = {
+  id: number;
+  message: string;
+};
+
+export type SendcloudWebhookAction =
+  | "parcel_status_changed"
+  | "refund_requested"
+  | "integration_connected"
+  | "integration_deleted"
+  | "integration_modified";
+
+export type SendcloudWebhookParcel = {
+  id: number;
+  tracking_number?: string | null;
+  tracking_url?: string | null;
+  status?: SendcloudWebhookParcelStatus;
+  order_number?: string | null;
+  external_reference?: string | null;
+};
+
+export type SendcloudWebhookPayload = {
+  action: SendcloudWebhookAction | string;
+  timestamp: number;
+  parcel?: SendcloudWebhookParcel;
+  refund_reason?: string | null;
+};
+
 export type SendCloudReturnShippingOption = {
   code: string;
 };

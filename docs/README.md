@@ -12,6 +12,7 @@ Each feature landed in this plugin gets its own page here. The index is the auth
 - [Cancel fulfillment — `cancelFulfillment` (§3.7)](./cancel-fulfillment.md) — cancel a SendCloud shipment (manual or compensation)
 - [Variant customs resolution](./variant-customs-resolution.md) — `order.placed` subscriber enriches `order.metadata.sendcloud_variants` so `createFulfillment` can populate `hs_code`, `origin_country`, per-item weight
 - [Create return fulfillment — `createReturnFulfillment` (§3.8)](./create-return-fulfillment.md) — inverted-address return parcel via `/api/v3/returns/announce-synchronously`
+- [Webhook sync — `parcel_status_changed` + `refund_requested` (§4)](./webhook-sync.md) — HMAC-verified SendCloud → Medusa tracking lifecycle + delivered/exception flags
 
 ## OpenAPI snapshots
 
@@ -29,7 +30,8 @@ Vendor-authoritative copies of the SendCloud v3 specs the plugin relies on. Kept
 - [`plans/04-create-and-cancel-fulfillment.md`](./plans/04-create-and-cancel-fulfillment.md) — cycle 04: `createFulfillment` + `cancelFulfillment`
 - [`plans/05-variant-resolution-for-customs.md`](./plans/05-variant-resolution-for-customs.md) — cycle 05: variant customs resolution via subscriber
 - [`plans/06-create-return-fulfillment.md`](./plans/06-create-return-fulfillment.md) — cycle 06: `createReturnFulfillment`
+- [`plans/07-webhook-parcel-status-sync.md`](./plans/07-webhook-parcel-status-sync.md) — cycle 07: `parcel_status_changed` + `refund_requested` webhook
 
 ## Roadmap
 
-See `../../chocolaterie/docs/medusa-sendcloud-plugin-spec.md` §19 for the full feature checklist (P0 → P3). Next cycle: §4 `parcel_status_changed` webhook — tracking lifecycle sync from SendCloud back into Medusa.
+See `../../chocolaterie/docs/medusa-sendcloud-plugin-spec.md` §19 for the full feature checklist (P0 → P3). P0 is now complete. Next cycle: §5 service-point lookup — storefront route that proxies SendCloud's service-point API for PUDO pickup-selection UX.
