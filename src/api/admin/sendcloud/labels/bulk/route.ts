@@ -26,7 +26,8 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
     return;
   }
 
-  const filename = `sendcloud-labels-${Date.now()}.pdf`;
+  const isoDate = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const filename = `sendcloud-labels-${isoDate}-${Date.now()}.pdf`;
   res
     .status(200)
     .set("content-type", result.contentType)

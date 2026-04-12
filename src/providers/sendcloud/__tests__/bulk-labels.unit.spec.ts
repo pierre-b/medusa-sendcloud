@@ -183,6 +183,33 @@ describe("fetchSendcloudBulkLabels", () => {
     expect(result.status).toBe(502);
   });
 
+  it("returns 502 when Query.graph throws", async () => {
+    const scope: Record<string, unknown> = {
+      [PROVIDER_KEY]: { client_: client },
+      query: {
+        graph: jest.fn(async () => {
+          throw new Error("db connection lost");
+        }),
+      },
+    };
+    const container = {
+      resolve: jest.fn((key: string) => {
+        if (!(key in scope)) throw new Error(`no registration for ${key}`);
+        return scope[key];
+      }),
+    } as unknown as Parameters<typeof fetchSendcloudBulkLabels>[0];
+
+    const result = await fetchSendcloudBulkLabels(container, PROVIDER_KEY, {
+      fulfillmentIds: ["ful_1"],
+      paperSize: "a6",
+    });
+
+    expect(result.status).toBe(502);
+    if (result.status === 502) {
+      expect(result.body.message).toMatch(/db connection lost/);
+    }
+  });
+
   it("wraps upstream 404 as a 502 with the SendCloud message", async () => {
     nock(DEFAULT_SENDCLOUD_BASE_URL)
       .get(BULK_LABELS_PATH)

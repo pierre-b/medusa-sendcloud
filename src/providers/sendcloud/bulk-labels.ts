@@ -53,14 +53,25 @@ export const fetchSendcloudBulkLabels = async (
     };
   }
 
-  const query = container.resolve(ContainerRegistrationKeys.QUERY);
-  const { data } = await query.graph({
-    entity: "fulfillment",
-    filters: { id: input.fulfillmentIds },
-    fields: ["id", "data"],
-  });
-
-  const rows = data as FulfillmentRow[];
+  let rows: FulfillmentRow[];
+  try {
+    const query = container.resolve(ContainerRegistrationKeys.QUERY);
+    const { data } = await query.graph({
+      entity: "fulfillment",
+      filters: { id: input.fulfillmentIds },
+      fields: ["id", "data"],
+    });
+    rows = data as FulfillmentRow[];
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "unknown Query failure";
+    return {
+      status: 502,
+      body: {
+        message: `medusa-sendcloud: failed to resolve fulfillments via Query: ${message}`,
+      },
+    };
+  }
   const foundIds = new Set(rows.map((row) => row.id));
   const missing = input.fulfillmentIds.filter((id) => !foundIds.has(id));
   if (missing.length > 0) {
