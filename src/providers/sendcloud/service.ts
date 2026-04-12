@@ -31,6 +31,7 @@ import {
   buildToAddress,
   isValidServicePointId,
   readSendCloudCode,
+  readSendcloudVariantsFromOrder,
   requireString,
 } from "./helpers";
 
@@ -192,7 +193,11 @@ export class SendCloudFulfillmentProvider extends AbstractFulfillmentProviderSer
     const parcel = buildShipmentParcel(
       items as FulfillmentItemDTO[] | undefined,
       order,
-      { insuranceAmount: this.options_.defaultInsuranceAmount }
+      {
+        insuranceAmount: this.options_.defaultInsuranceAmount,
+        variantsMap: readSendcloudVariantsFromOrder(order),
+        weightUnit: this.options_.weightUnit ?? "g",
+      }
     );
 
     const orderReference =

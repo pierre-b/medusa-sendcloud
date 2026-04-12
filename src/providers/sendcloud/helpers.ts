@@ -11,6 +11,8 @@ import type {
   SendCloudParcelItemRequest,
   SendCloudParcelRequest,
   SendCloudShippingOptionsFilter,
+  SendCloudVariantCustomsEntry,
+  SendCloudVariantsMap,
 } from "../../types/sendcloud-api";
 
 export const readSendCloudCode = (data: Record<string, unknown>): string => {
@@ -118,17 +120,80 @@ export const buildToAddress = (rawAddress: unknown): SendCloudAddress => {
   return result;
 };
 
+export const extractVariantIds = (
+  items: Array<{ variant_id?: string | null }> | undefined
+): string[] => {
+  if (!items) return [];
+  const seen = new Set<string>();
+  for (const item of items) {
+    if (item?.variant_id && typeof item.variant_id === "string") {
+      seen.add(item.variant_id);
+    }
+  }
+  return Array.from(seen);
+};
+
+export const buildVariantsMap = (
+  variants: Array<{
+    id?: string;
+    hs_code?: string | null;
+    origin_country?: string | null;
+    weight?: number | null;
+  }>
+): SendCloudVariantsMap => {
+  const out: SendCloudVariantsMap = {};
+  for (const variant of variants) {
+    if (!variant?.id) continue;
+    const entry: SendCloudVariantCustomsEntry = {};
+    if (variant.hs_code) entry.hs_code = variant.hs_code;
+    if (variant.origin_country) entry.origin_country = variant.origin_country;
+    if (typeof variant.weight === "number" && variant.weight > 0) {
+      entry.weight = variant.weight;
+    }
+    if (Object.keys(entry).length > 0) {
+      out[variant.id] = entry;
+    }
+  }
+  return out;
+};
+
+export const readSendcloudVariantsFromOrder = (
+  order: Partial<FulfillmentOrderDTO> | undefined
+): SendCloudVariantsMap => {
+  const metadata = order?.metadata;
+  if (!metadata || typeof metadata !== "object") return {};
+  const raw = (metadata as Record<string, unknown>).sendcloud_variants;
+  if (!raw || typeof raw !== "object") return {};
+  return raw as SendCloudVariantsMap;
+};
+
 export const buildParcelItems = (
   items: FulfillmentItemDTO[] | undefined,
-  order: Partial<FulfillmentOrderDTO> | undefined
+  order: Partial<FulfillmentOrderDTO> | undefined,
+  opts: {
+    variantsMap?: SendCloudVariantsMap;
+    weightUnit?: SendCloudWeightUnitOption;
+  } = {}
 ): SendCloudParcelItemRequest[] => {
   if (!items || items.length === 0) return [];
 
-  const lineItemPriceById = new Map<string, { unit_price: number }>();
+  const variantsMap = opts.variantsMap ?? {};
+  const weightUnit = opts.weightUnit ?? "g";
+
+  const lineItemsById = new Map<
+    string,
+    { unit_price?: number; variant_id?: string | null }
+  >();
   const currency = order?.currency_code;
   for (const lineItem of order?.items ?? []) {
-    if (lineItem?.id && typeof lineItem.unit_price === "number") {
-      lineItemPriceById.set(lineItem.id, { unit_price: lineItem.unit_price });
+    if (lineItem?.id) {
+      lineItemsById.set(lineItem.id, {
+        unit_price:
+          typeof lineItem.unit_price === "number"
+            ? lineItem.unit_price
+            : undefined,
+        variant_id: lineItem.variant_id ?? null,
+      });
     }
   }
 
@@ -140,15 +205,35 @@ export const buildParcelItems = (
     if (item.sku) entry.sku = item.sku;
     if (item.id) entry.item_id = item.id;
 
-    const matching = item.line_item_id
-      ? lineItemPriceById.get(item.line_item_id)
+    const lineItem = item.line_item_id
+      ? lineItemsById.get(item.line_item_id)
       : undefined;
-    if (matching && typeof currency === "string" && currency.length > 0) {
+
+    if (
+      lineItem?.unit_price !== undefined &&
+      typeof currency === "string" &&
+      currency.length > 0
+    ) {
       entry.price = {
-        value: String(matching.unit_price),
+        value: String(lineItem.unit_price),
         currency: currency.toUpperCase(),
       };
     }
+
+    const variantId = lineItem?.variant_id ?? undefined;
+    const customs: SendCloudVariantCustomsEntry | undefined = variantId
+      ? variantsMap[variantId]
+      : undefined;
+
+    if (customs) {
+      if (customs.hs_code) entry.hs_code = customs.hs_code;
+      if (customs.origin_country) entry.origin_country = customs.origin_country;
+      if (typeof customs.weight === "number" && customs.weight > 0) {
+        const kg = convertToKg(customs.weight, weightUnit);
+        entry.weight = { value: kg.toFixed(3), unit: "kg" };
+      }
+    }
+
     return entry;
   });
 };
@@ -156,10 +241,17 @@ export const buildParcelItems = (
 export const buildShipmentParcel = (
   items: FulfillmentItemDTO[] | undefined,
   order: Partial<FulfillmentOrderDTO> | undefined,
-  opts: { insuranceAmount?: number }
+  opts: {
+    insuranceAmount?: number;
+    variantsMap?: SendCloudVariantsMap;
+    weightUnit?: SendCloudWeightUnitOption;
+  }
 ): SendCloudParcelRequest => {
   const parcel: SendCloudParcelRequest = {};
-  const parcelItems = buildParcelItems(items, order);
+  const parcelItems = buildParcelItems(items, order, {
+    variantsMap: opts.variantsMap,
+    weightUnit: opts.weightUnit,
+  });
   if (parcelItems.length > 0) {
     parcel.parcel_items = parcelItems;
   }

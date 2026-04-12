@@ -925,6 +925,85 @@ describe("SendCloudFulfillmentProvider", () => {
       });
     });
 
+    it("merges variant customs fields from order.metadata.sendcloud_variants into parcel_items", async () => {
+      let capturedBody: Record<string, unknown> | undefined;
+      nock(BASE)
+        .post(SHIPMENTS_PATH, (body) => {
+          capturedBody = body as Record<string, unknown>;
+          return true;
+        })
+        .reply(201, shipmentResponse);
+
+      const orderWithVariants = {
+        ...orderFixture,
+        items: [
+          {
+            id: "li_1",
+            title: "Bar of Chocolate",
+            unit_price: 925,
+            quantity: 2,
+            variant_id: "var_cocoa",
+            variant_sku: "BAR-001",
+            product_title: "Dark chocolate bar",
+          },
+        ],
+        metadata: {
+          sendcloud_variants: {
+            var_cocoa: {
+              hs_code: "180690",
+              origin_country: "FR",
+              weight: 90,
+            },
+          },
+        },
+      } as unknown as Parameters<
+        SendCloudFulfillmentProvider["createFulfillment"]
+      >[2];
+
+      await buildProvider().createFulfillment(
+        fulfillmentData,
+        fulfillmentItems,
+        orderWithVariants,
+        fulfillmentFixture
+      );
+
+      const parcel = (
+        capturedBody as { parcels: Array<Record<string, unknown>> }
+      ).parcels[0];
+      const parcelItems = parcel.parcel_items as Array<Record<string, unknown>>;
+      expect(parcelItems).toHaveLength(1);
+      expect(parcelItems[0]).toMatchObject({
+        hs_code: "180690",
+        origin_country: "FR",
+        weight: { value: "0.090", unit: "kg" },
+      });
+    });
+
+    it("falls back to basic parcel_items when order.metadata is absent", async () => {
+      let capturedBody: Record<string, unknown> | undefined;
+      nock(BASE)
+        .post(SHIPMENTS_PATH, (body) => {
+          capturedBody = body as Record<string, unknown>;
+          return true;
+        })
+        .reply(201, shipmentResponse);
+
+      await buildProvider().createFulfillment(
+        fulfillmentData,
+        fulfillmentItems,
+        orderFixture,
+        fulfillmentFixture
+      );
+
+      const parcel = (
+        capturedBody as { parcels: Array<Record<string, unknown>> }
+      ).parcels[0];
+      const parcelItems = parcel.parcel_items as Array<Record<string, unknown>>;
+      expect(parcelItems[0]).not.toHaveProperty("hs_code");
+      expect(parcelItems[0]).not.toHaveProperty("origin_country");
+      expect(parcelItems[0]).not.toHaveProperty("weight");
+    });
+
     it("returns labels: [] when the parcel has no label document yet", async () => {
       const noLabelResponse = {
         data: {

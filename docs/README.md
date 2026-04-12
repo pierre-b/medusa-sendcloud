@@ -10,6 +10,7 @@ Each feature landed in this plugin gets its own page here. The index is the auth
 - [Calculate price — `calculatePrice` (§3.4)](./calculate-price.md) — live SendCloud quote per shipping option at checkout
 - [Create fulfillment — `createFulfillment` (§3.6)](./create-fulfillment.md) — announce the shipment to SendCloud and persist tracking + label URL
 - [Cancel fulfillment — `cancelFulfillment` (§3.7)](./cancel-fulfillment.md) — cancel a SendCloud shipment (manual or compensation)
+- [Variant customs resolution](./variant-customs-resolution.md) — `order.placed` subscriber enriches `order.metadata.sendcloud_variants` so `createFulfillment` can populate `hs_code`, `origin_country`, per-item weight
 
 ## OpenAPI snapshots
 
@@ -24,7 +25,8 @@ Vendor-authoritative copies of the SendCloud v3 specs the plugin relies on. Kept
 - [`plans/02-validate-option-and-checkout-data.md`](./plans/02-validate-option-and-checkout-data.md) — cycle 02: `validateOption` + `canCalculate` + `validateFulfillmentData`
 - [`plans/03-calculate-price.md`](./plans/03-calculate-price.md) — cycle 03: `calculatePrice`
 - [`plans/04-create-and-cancel-fulfillment.md`](./plans/04-create-and-cancel-fulfillment.md) — cycle 04: `createFulfillment` + `cancelFulfillment`
+- [`plans/05-variant-resolution-for-customs.md`](./plans/05-variant-resolution-for-customs.md) — cycle 05: variant customs resolution via subscriber
 
 ## Roadmap
 
-See `../../chocolaterie/docs/medusa-sendcloud-plugin-spec.md` §19 for the full feature checklist (P0 → P3). Next cycle: §3.8 `createReturnFulfillment` + variant resolution for full customs.
+See `../../chocolaterie/docs/medusa-sendcloud-plugin-spec.md` §19 for the full feature checklist (P0 → P3). Next cycle: §3.8 `createReturnFulfillment`.

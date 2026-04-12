@@ -260,3 +260,11 @@ export type SendCloudShipmentCancelResponse = {
     message: string;
   };
 };
+
+export type SendCloudVariantCustomsEntry = {
+  hs_code?: string;
+  origin_country?: string;
+  weight?: number;
+};
+
+export type SendCloudVariantsMap = Record<string, SendCloudVariantCustomsEntry>;

@@ -50,11 +50,29 @@ SendCloud quotes in EUR by default (and the shipping-options snapshot only lists
 
 ---
 
+## Resolved in cycle 05 (variant customs resolution, 2026-04-12)
+
+### ✅ Variant resolution for full customs
+
+Cycle-04 gap closed via an `order.placed` subscriber. Plugin resolves Query from the Medusa container, fetches `hs_code`, `origin_country`, and `weight` for every variant in the order, and merges them into `order.metadata.sendcloud_variants`. `buildParcelItems` reads from this metadata at fulfillment time and populates the corresponding SendCloud fields. Customer-placed orders now ship with full customs out of the gate.
+
+Known gap (parked, see below): admin-created manual orders that skip `order.placed` still miss customs.
+
+---
+
+## Added in cycle 05 (variant customs resolution, 2026-04-12)
+
+### Admin-created / manual-order customs gap
+
+Admin creates an order directly (no checkout flow → no `order.placed` event) → subscriber never fires → `order.metadata.sendcloud_variants` stays empty → fulfillment ships without per-item customs. Workarounds for now: re-enrich manually via a custom admin call, or ship internationally only for customer-placed orders. A future cycle can add an explicit re-resolve endpoint / admin button.
+
+### Subscriber race window
+
+`order.placed` emits at checkout completion; the subscriber runs asynchronously. In theory an admin fulfilling an order _during_ the subscriber's Query latency window sees empty metadata. In practice admins fulfil minutes+ after order placement, so we accept the race.
+
+---
+
 ## Added in cycle 04 (createFulfillment + cancelFulfillment, 2026-04-12)
-
-### Variant resolution for full customs
-
-`FulfillmentItemDTO` and `FulfillmentOrderLineItemDTO` don't expose `variant.weight`, `variant.hs_code`, or `variant.origin_country`. This cycle sends `parcel_items[]` with `description`, `quantity`, `sku`, `item_id`, and resolvable `price` — enough for EU-internal shipments. International non-EU shipments will fail at the carrier step until we resolve variants via `productModuleService` or a workflow wrapper that pre-enriches `fulfillment.data.sendcloud_items`.
 
 ### Multi-collo single-parcel assumption
 
