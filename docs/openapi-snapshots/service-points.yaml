@@ -1,0 +1,1291 @@
+openapi: 3.1.0
+info:
+  title: Service points
+  version: 2.0.0
+  description: >-
+    The Service Point API allows you to retrieve service point locations, verify
+    their availability and store them in the Sendcloud platform during the
+    checkout process.
+  contact:
+    name: Sendcloud API Support
+    url: https://www.sendcloud.dev
+    email: contact@sendcloud.com
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+servers:
+  - url: https://servicepoints.sendcloud.sc/api/v2
+    description: Sendcloud Production
+tags:
+  - name: Service Points
+    description: Endpoints related to Service Points flow
+paths:
+  /service-points:
+    get:
+      summary: Retrieve a list of service points
+      description: >-
+        Retrieve a list of available service points and the associated service
+        point `id`.
+      x-mint:
+        href: /api/v2/service-points/retrieve-a-list-of-service-points
+        content: >-
+          Only service points which are applicable to the carriers you have
+          enabled in the integration settings menu will be returned. You can
+          filter the results based on GPS location or `address` in combination
+          with a search `radius`.
+
+
+          ## How carriers are selected
+
+          - If the `carrier` parameter is **not provided**, service points for
+          all carriers enabled in your integration settings are returned.
+
+          - If the `carrier` parameter **is provided**, only service points for
+          the specified carriers are returned. All requested carriers must be
+          enabled in your integration settings — if any are not, a `400` error
+          is returned.
+
+
+          ## Notes
+
+          - If provided, `latitude` and `longitude` specify a reference point
+          from which a `distance` will be computed for each service point, and
+          returned with the response.
+
+          - Some carriers impose limits for certain service points. For this
+          reason, you can specify the `weight` parameter to ensure that only
+          usable service points are returned. Currently this only applies to
+          Poste Italiane, which excludes `punto_poste` service points when the
+          weight exceeds 15 kg.
+
+          - If provided, `postal_code` will return a list of service points
+          which are located **exactly within the bounds** of the specified
+          postal code area.
+
+          - The `address` parameter retrieves a list of service points closest
+          to the geocoded location. You can limit the results through the
+          `radius` parameter.
+
+          - The `address` parameter accepts postal codes in addition to street
+          names.
+
+          - The `address` parameter should **not** be used together with `city`,
+          `postal_code`, or `house_number`, as those perform exact matching.
+      operationId: sc-public-v2-servicepoints-get-service_points
+      security:
+        - HTTPBasicAuth: []
+        - OAuth2ClientCreds: []
+        - AccessTokenAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/service-point'
+              examples:
+                FullResponse:
+                  summary: Service points with all fields populated
+                  value:
+                    - id: 10875349
+                      code: '217165'
+                      is_active: true
+                      shop_type: parcelShop
+                      general_shop_type: servicepoint
+                      extra_data:
+                        partner_name: PostNL
+                        sales_channel: AFHAALPUNT
+                        terminal_type: NRS
+                        retail_network_id: PNPNL-01
+                      name: Example Parcel Shop
+                      street: Voorbeeldstraat
+                      house_number: '12'
+                      postal_code: 5611AG
+                      city: EINDHOVEN
+                      latitude: '51.441444'
+                      longitude: '5.475185'
+                      email: info@example.com
+                      phone: '+31401234567'
+                      homepage: https://www.example.com
+                      carrier: postnl
+                      country: NL
+                      formatted_opening_times:
+                        '0':
+                          - 10:00 - 20:00
+                        '1':
+                          - 10:00 - 20:00
+                        '2':
+                          - 10:00 - 20:00
+                        '3':
+                          - 10:00 - 20:00
+                        '4':
+                          - 10:00 - 20:00
+                        '5':
+                          - 10:00 - 18:00
+                        '6': []
+                      open_tomorrow: true
+                      open_upcoming_week: true
+                      distance: 381
+                    - id: 20948712
+                      code: DE-4291
+                      is_active: true
+                      shop_type: packStation
+                      general_shop_type: locker
+                      extra_data: {}
+                      name: Packstation 142
+                      street: Voorbeeldlaan
+                      house_number: '2'
+                      postal_code: 5611AZ
+                      city: EINDHOVEN
+                      latitude: '51.438200'
+                      longitude: '5.478600'
+                      email: ''
+                      phone: ''
+                      homepage: ''
+                      carrier: dhl
+                      country: NL
+                      formatted_opening_times:
+                        '0':
+                          - 00:00 - 23:59
+                        '1':
+                          - 00:00 - 23:59
+                        '2':
+                          - 00:00 - 23:59
+                        '3':
+                          - 00:00 - 23:59
+                        '4':
+                          - 00:00 - 23:59
+                        '5':
+                          - 00:00 - 23:59
+                        '6':
+                          - 00:00 - 23:59
+                      open_tomorrow: true
+                      open_upcoming_week: true
+                      distance: 520
+                    - id: 30581927
+                      code: IT-89201
+                      is_active: true
+                      shop_type: punto_poste
+                      general_shop_type: post_office
+                      extra_data:
+                        partner_name: Poste Italiane
+                      name: Post Office Eindhoven
+                      street: Voorbeeldweg
+                      house_number: '48'
+                      postal_code: 5611ET
+                      city: EINDHOVEN
+                      latitude: '51.439100'
+                      longitude: '5.479300'
+                      email: ''
+                      phone: ''
+                      homepage: ''
+                      carrier: poste_italiane
+                      country: NL
+                      formatted_opening_times:
+                        '0':
+                          - 09:00 - 17:00
+                        '1':
+                          - 09:00 - 17:00
+                        '2':
+                          - 09:00 - 17:00
+                        '3':
+                          - 09:00 - 17:00
+                        '4':
+                          - 09:00 - 17:00
+                        '5': []
+                        '6': []
+                      open_tomorrow: true
+                      open_upcoming_week: true
+                      distance: 680
+                MinimalResponse:
+                  summary: Service points with minimal data
+                  value:
+                    - id: 10875349
+                      code: '217165'
+                      is_active: true
+                      shop_type: null
+                      general_shop_type: null
+                      extra_data: {}
+                      name: Example Pickup Point
+                      street: Voorbeeldstraat
+                      house_number: '5'
+                      postal_code: 5611AG
+                      city: EINDHOVEN
+                      latitude: '51.441444'
+                      longitude: '5.475185'
+                      email: ''
+                      phone: ''
+                      homepage: ''
+                      carrier: postnl
+                      country: NL
+                      formatted_opening_times:
+                        '0': []
+                        '1': []
+                        '2': []
+                        '3': []
+                        '4': []
+                        '5': []
+                        '6': []
+                      open_tomorrow: false
+                      open_upcoming_week: false
+        '400':
+          $ref: '#/components/responses/400'
+      parameters:
+        - schema:
+            type: string
+          in: header
+          name: X-Requested-With
+          description: Identifies the request as one made using JavaScript
+        - $ref: '#/components/parameters/AccessToken'
+        - schema:
+            type: string
+            example: NL
+          in: query
+          name: country
+          description: A country ISO 2 code
+          required: true
+        - schema:
+            type: string
+            example: postnl,dpd
+          in: query
+          name: carrier
+          description: >-
+            A comma-separated list of carrier codes to filter by (e.g.
+            `postnl,dpd`). Only carriers that are enabled in your integration
+            settings can be requested — a `400` error is returned if any of the
+            requested carriers are not enabled.
+        - schema:
+            type: string
+          in: query
+          name: latitude
+          description: >-
+            Used as a reference point to calculate the distance of the service
+            point to the provided location.
+        - schema:
+            type: string
+          in: query
+          name: longitude
+          description: >-
+            Used as a reference point to calculate the distance of the service
+            point to the provided location.
+        - schema:
+            type: string
+          in: query
+          name: ne_latitude
+          description: >-
+            Latitude of the northeast corner of the bounding box. Must be
+            provided together with `ne_longitude`, `sw_latitude`, and
+            `sw_longitude` to define a rectangular search area. Cannot be
+            combined with `radius`.
+        - schema:
+            type: string
+          in: query
+          name: ne_longitude
+          description: >-
+            Longitude of the northeast corner of the bounding box. Must be
+            provided together with `ne_latitude`, `sw_latitude`, and
+            `sw_longitude`. Cannot be combined with `radius`.
+        - schema:
+            type: string
+          in: query
+          name: sw_latitude
+          description: >-
+            Latitude of the southwest corner of the bounding box. Must be
+            provided together with `ne_latitude`, `ne_longitude`, and
+            `sw_longitude`. Cannot be combined with `radius`.
+        - schema:
+            type: string
+          in: query
+          name: sw_longitude
+          description: >-
+            Longitude of the southwest corner of the bounding box. Must be
+            provided together with `ne_latitude`, `ne_longitude`, and
+            `sw_latitude`. Cannot be combined with `radius`.
+        - schema:
+            type: string
+            example: Stadhuisplein 10
+          in: query
+          name: address
+          description: >-
+            A free-text string that is geocoded to find service points near the
+            resolved location. Can accept a street name, house number, postal
+            code, or a combination.
+
+            Avoid mixing with the `city`, `postal_code`, or `house_number`
+            parameters, as those perform strict exact matching (e.g.
+            `city=Munich` would return no results, while `city=München` would).
+            Combining free-form and strict filters is technically possible but
+            should be done with caution.
+        - schema:
+            type: string
+            example: Eindhoven
+          in: query
+          name: city
+          description: >-
+            City of the destination address. Performs an **exact match** —
+            spelling must be precise (e.g. `München`, not `Munich`). Avoid
+            mixing with the `address` parameter.
+        - schema:
+            type: string
+            example: 5611 EM
+          in: query
+          name: postal_code
+          description: >-
+            Postal code of the destination address. Performs an **exact match**
+            — only service points located within the bounds of the specified
+            postal code area are returned. Avoid mixing with the `address`
+            parameter.
+        - schema:
+            type: string
+            example: '10'
+          in: query
+          name: house_number
+          description: >-
+            House number of the destination address. Performs an **exact
+            match**. Avoid mixing with the `address` parameter.
+        - schema:
+            type: integer
+            minimum: 100
+            maximum: 50000
+          in: query
+          name: radius
+          description: >-
+            Optional radius (in meters) that limits results to service points
+            within the specified distance from the reference location. Can be
+            used instead of the `ne_latitude`, `ne_longitude`, `sw_latitude`,
+            and `sw_longitude` bounding box parameters.
+        - schema:
+            type: number
+            format: double
+          in: query
+          name: weight
+          description: >-
+            Weight (in kg) of the parcel to be shipped to the service point.
+            Currently only applies to Poste Italiane: when the weight exceeds 15
+            kg, `punto_poste` service points are excluded from the results.
+        - schema:
+            type: string
+            maxLength: 7
+          in: query
+          name: pudo_id
+          description: >-
+            A DPD-specific service point identifier. Use this to look up a
+            specific DPD service point by its PUDO ID.
+        - schema:
+            type: string
+          in: query
+          name: shop_type
+          description: >-
+            Filters results by the carrier-specific shop type (e.g.
+            `parcelShop`, `packStation`, `punto_poste`). Values vary per
+            carrier. Use `general_shop_type` instead if you want to filter by
+            Sendcloud's normalized categories.
+        - schema:
+            type: string
+            example: servicepoint
+          in: query
+          name: general_shop_type
+          description: >
+            Filters results by Sendcloud's normalized shop type.
+            Carrier-specific shop types are mapped to a fixed set of values,
+            making it easier to filter consistently across carriers. Accepts a
+            single value (e.g., `servicepoint`) or a comma-separated list of
+            values (e.g., `servicepoint,locker,post_office`).
+
+
+            Possible options:
+
+            - `servicepoint`
+
+            - `locker`
+
+            - `post_office`
+
+            - `carrier_depot`
+      tags:
+        - Service Points
+    parameters: []
+  /service-points/{service_point_id}:
+    get:
+      summary: Retrieve a service point
+      operationId: sc-public-v2-servicepoints-get-service_point_by_id
+      x-mint:
+        href: /api/v2/service-points/retrieve-a-service-point
+      security:
+        - HTTPBasicAuth: []
+        - OAuth2ClientCreds: []
+        - AccessTokenAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/service-point'
+              examples:
+                RetrieveServicePoint:
+                  summary: Retrieve a service point
+                  value:
+                    id: 26
+                    code: 4c8181feec8f49fdbe67d9c9f6aaaf6f
+                    is_active: true
+                    shop_type: null
+                    general_shop_type: unknown
+                    extra_data: {}
+                    name: DUMMY-3f1d6384391f45ce
+                    street: Sesamstraat
+                    house_number: '40'
+                    postal_code: 5699YE
+                    city: Eindhoven
+                    latitude: '51.440400'
+                    longitude: '5.475800'
+                    email: devnull@sendcloud.nl
+                    phone: '+31401234567'
+                    homepage: https://www.sendcloud.nl
+                    carrier: postnl
+                    country: NL
+                    formatted_opening_times:
+                      '0':
+                        - 13:30 - 17:15
+                      '1':
+                        - 09:00 - 12:00
+                        - 13:30 - 17:15
+                      '2':
+                        - 09:00 - 12:00
+                        - 13:30 - 17:15
+                      '3': []
+                      '4':
+                        - 09:00 - 12:00
+                        - 13:30 - 17:15
+                      '5':
+                        - 09:00 - 12:00
+                        - 13:30 - 17:15
+                      '6': []
+                    open_tomorrow: true
+                    open_upcoming_week: true
+        '404':
+          $ref: '#/components/responses/404'
+      parameters:
+        - $ref: '#/components/parameters/AccessToken'
+      description: >-
+        Retrieve information about a specific service point location, including
+        opening hours and applicable carriers, based on the service point `id`.
+      tags:
+        - Service Points
+    parameters:
+      - schema:
+          type: number
+        name: service_point_id
+        in: path
+        required: true
+        description: ID of the service point
+  /service-points/{service_point_id}/check-availability:
+    get:
+      summary: Retrieve availability of a service point
+      description: >-
+        Retrieve a `true` or `false` value which reflects the current
+        availability of a given service point `id`.
+      x-mint:
+        href: /api/v2/service-points/retrieve-availability-of-a-service-point
+      operationId: sc-public-v2-servicepoints-get-check_availability
+      security:
+        - HTTPBasicAuth: []
+        - OAuth2ClientCreds: []
+        - AccessTokenAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: boolean
+              examples:
+                'True':
+                  value: true
+                'False':
+                  value: false
+        '404':
+          $ref: '#/components/responses/404'
+      parameters:
+        - $ref: '#/components/parameters/AccessToken'
+      tags:
+        - Service Points
+    parameters:
+      - schema:
+          type: number
+        name: service_point_id
+        in: path
+        required: true
+        description: ID of the service point
+  /service-points/check_and_store:
+    post:
+      summary: Create a selected servicepoint record after checking its availability
+      description: >-
+        Used for two main things:
+
+        1. Verify the availability and opening times of a service point
+
+        2. Store a selected service point in the Sendcloud platform (this is
+        necessary for integration types which don’t allow storing data on orders
+        like PrestaShop or Lightspeed)
+      operationId: sc-public-v2-servicepoints-post-check_and_store
+      security:
+        - HTTPBasicAuth: []
+        - OAuth2ClientCreds: []
+        - AccessTokenAuth: []
+      tags:
+        - Service Points
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  availability:
+                    type: integer
+                    enum:
+                      - 0
+                      - 1
+                      - 2
+                    description: |-
+                      A number indicating the availability of the service point
+                      - 0: not available
+                      - 1: available
+                      - 2: available but was changed
+                  service_point:
+                    $ref: '#/components/schemas/service-point'
+                  stored:
+                    type: boolean
+                    description: >-
+                      Present with the value “true” if the service point was
+                      stored. Not present otherwise.
+                required:
+                  - availability
+                  - service_point
+              examples:
+                PostNL-service-point:
+                  value:
+                    availability: 0
+                    service_point:
+                      id: 10875349
+                      code: '217165'
+                      is_active: true
+                      shop_type: null
+                      extra_data:
+                        partner_name: PostNL
+                        sales_channel: AFHAALPUNT
+                        terminal_type: NRS
+                        retail_network_id: PNPNL-01
+                      name: Media Markt Eindhoven Centrum B.V.
+                      street: Boschdijktunnel
+                      house_number: '1'
+                      postal_code: 5611AG
+                      city: EINDHOVEN
+                      latitude: '51.441444'
+                      longitude: '5.475185'
+                      email: ''
+                      phone: ''
+                      homepage: ''
+                      carrier: postnl
+                      country: NL
+                      formatted_opening_times:
+                        '0':
+                          - 10:00 - 20:00
+                        '1':
+                          - 10:00 - 20:00
+                        '2':
+                          - 10:00 - 20:00
+                        '3':
+                          - 10:00 - 20:00
+                        '4':
+                          - 10:00 - 20:00
+                        '5':
+                          - 10:00 - 18:00
+                        '6': []
+                      open_tomorrow: true
+                      open_upcoming_week: true
+                      distance: 381
+                    stored: true
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      parameters:
+        - $ref: '#/components/parameters/AccessToken'
+        - schema:
+            type: string
+          in: header
+          name: X-Requested-With
+          description: Identifies the request as one made using JavaScript
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              description: ''
+              type: object
+              properties:
+                service_point:
+                  type: number
+                access_token:
+                  type: string
+                check_availability:
+                  type: boolean
+                store_order_id:
+                  type: string
+                checkout_shippingmethod_id:
+                  type: string
+                checkout_shippingmethod_name:
+                  type: string
+                to_post_number:
+                  type: string
+              required:
+                - service_point
+                - access_token
+                - check_availability
+                - store_order_id
+                - checkout_shippingmethod_id
+                - checkout_shippingmethod_name
+                - to_post_number
+            examples:
+              Example:
+                value:
+                  service_point: 10870606
+                  access_token: >-
+                    eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE2MjU0OTAzNTcsImlkIjo2MTM2Mn0.j7ClcaArLclWkRtS5R7TRCi8aOx5zliIfmenObqu1RQ
+                  check_availability: true
+                  store_order_id: ''
+                  checkout_shippingmethod_id: ''
+                  checkout_shippingmethod_name: ''
+                  to_post_number: ''
+    parameters: []
+  /service-points/items_fit_in_shipment:
+    post:
+      summary: Service point carrier dimension check
+      description: >-
+        Retrieve a list of carriers that support cart item dimensions based on
+        carrier size restrictions for a provided list of carriers
+      operationId: sc-public-v2-servicepoints-post-items_fit_in_shipment
+      security:
+        - HTTPBasicAuth: []
+        - OAuth2ClientCreds: []
+        - AccessTokenAuth: []
+      tags:
+        - Service Points
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  fitting_carrier_codes:
+                    type: array
+                    description: >-
+                      List of carrier that support items with the specified
+                      dimensions.
+                    minItems: 0
+                    items:
+                      type: string
+                      example: postnl
+                required:
+                  - fitting_carrier_codes
+              examples:
+                Fitting-carriers:
+                  value:
+                    fitting_carrier_codes:
+                      - postnl
+                      - dhl
+                      - ups
+                No-fitting-carriers:
+                  value:
+                    fitting_carrier_codes: []
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      parameters:
+        - $ref: '#/components/parameters/AccessToken'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                carrier_codes:
+                  type: array
+                  items:
+                    type: string
+                    example: postnl
+                  description: >-
+                    List of service point carriers enabled for the delivery
+                    method.
+                dimensions:
+                  type: array
+                  description: >-
+                    List of items dimensions. Every element in the list must be
+                    a list of 3 numbers, corresponding to the 3 dimensions of an
+                    item.
+                  items:
+                    type: array
+                    minItems: 3
+                    maxItems: 3
+                    items:
+                      type: number
+                      minimum: 1
+                      example: 10
+                unit:
+                  type: string
+                  enum:
+                    - mm
+                    - cm
+                    - dm
+                    - m
+                    - in
+                    - yd
+                  example: cm
+              required:
+                - carrier_codes
+                - dimensions
+                - unit
+            examples:
+              Items-fit-in-shipment:
+                value:
+                  carrier_codes:
+                    - dpd
+                    - postnl
+                  dimensions:
+                    - - 100
+                      - 10
+                      - 1
+                    - - 10
+                      - 10
+                      - 10
+                  unit: cm
+        description: ''
+    parameters: []
+  /service-points/{shop_type}/store:
+    servers:
+      - url: https://servicepoints.sendcloud.sc
+        description: >-
+          Override base path for Shopify-specific endpoint to store a service
+          point
+    parameters:
+      - schema:
+          type: string
+        name: shop_type
+        in: path
+        required: true
+        description: Shop type for which a service point is being stored
+        example: shopify
+    get:
+      x-skip-lint: true
+      x-skip-lint-reason: legacy endpoint
+      summary: Create a selected service point object
+      description: Shopify-specific endpoint for storing an active service point
+      operationId: sc-public-v2-servicepoints-get-store
+      security: []
+      tags:
+        - Service Points
+      parameters:
+        - schema:
+            type: string
+          in: query
+          name: order_id
+          required: true
+          description: Order external id
+          example: '123456789'
+        - schema:
+            type: string
+          in: query
+          name: shop_identification
+          description: Identifier of the shop
+          required: true
+          example: best-website.com
+        - schema:
+            type: string
+          in: query
+          name: service_point
+          required: true
+          description: Service point id
+          example: '1'
+        - schema:
+            type: string
+          in: query
+          name: order_confirmation
+          description: ' '
+          required: true
+          example: John Doe + 1234
+        - schema:
+            type: string
+          in: query
+          name: checkout_shippingmethod_id
+          description: Unique identifier of the shipping method.
+          example: shopify-Service Point Delivery DPD
+        - schema:
+            type: string
+          in: query
+          description: Name of the shipping method.
+          name: checkout_shippingmethod_name
+          example: Service Point Delivery DPD
+        - schema:
+            type: string
+          in: query
+          name: to_post_number
+          description: ' '
+          example: '1338'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  order_id:
+                    type: string
+                    description: Order external id
+                    example: '123456789'
+                  shop_identification:
+                    type: string
+                    example: best-website.com
+                  service_point:
+                    type: integer
+                    description: Service point id
+                    example: 1
+                  to_post_number:
+                    type: string
+                    example: '1338'
+                  order_confirmation:
+                    type: string
+                    example: John Doe + 1234
+                  checkout_shippingmethod_id:
+                    type: string
+                    example: shopify-Service Point Delivery DPD
+                    nullable: true
+                  checkout_shippingmethod_name:
+                    type: string
+                    example: Service Point Delivery DPD
+                    nullable: true
+                required:
+                  - order_id
+                  - shop_identification
+                  - service_point
+                  - to_post_number
+                  - order_confirmation
+                  - checkout_shippingmethod_id
+                  - checkout_shippingmethod_name
+              examples:
+                FullExample:
+                  value:
+                    order_id: '123456789'
+                    shop_identification: best-website.com
+                    service_point: 1
+                    to_post_number: '1338'
+                    order_confirmation: John Doe + 1234
+                    checkout_shippingmethod_id: shopify-Service Point Delivery DPD
+                    checkout_shippingmethod_name: Service Point Delivery DPD
+                MinimalExample:
+                  value:
+                    order_id: '123456789'
+                    shop_identification: best-website.com
+                    service_point: 1
+                    to_post_number: ''
+                    order_confirmation: John Doe + 1234
+                    checkout_shippingmethod_id: null
+                    checkout_shippingmethod_name: null
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+  /carriers:
+    get:
+      summary: Retrieve a list of service point carriers
+      description: >-
+        Retrieve a list of carriers which are enabled for service point delivery
+        and can be accessed by the authenticating integration. Carriers can be
+        enabled or disabled via the integration settings menu in the Sendcloud
+        platform.
+      x-mint:
+        href: /api/v2/service-points/retrieve-a-list-of-service-point-carriers
+      operationId: sc-public-v2-servicepoints-get-carriers
+      security:
+        - HTTPBasicAuth: []
+        - OAuth2ClientCreds: []
+        - AccessTokenAuth: []
+      tags:
+        - Service Points
+      parameters:
+        - $ref: '#/components/parameters/AccessToken'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                description: >-
+                  A list of carrier codes that are enabled for service point
+                  delivery on the authenticating integration.
+                items:
+                  type: string
+                  description: A carrier code identifier (e.g. "postnl", "dhl").
+              examples:
+                CarrierList:
+                  summary: A list of carriers
+                  value:
+                    - postnl
+                    - dhl
+                    - dpd
+                    - ups
+        '403':
+          description: Forbidden
+    parameters: []
+components:
+  securitySchemes:
+    HTTPBasicAuth:
+      type: http
+      description: >-
+        Basic Authentication using API key and secrets is currently the main
+        authentication mechanism.
+      scheme: basic
+    OAuth2ClientCreds:
+      type: oauth2
+      description: >-
+        OAuth2 is a standardized protocol for authorization that allows users to
+        share their private resources stored on one site with another site
+        without having to provide their credentials. OAuth2 Client Credentials
+        Grant workflow. This workflow is typically used for server-to-server
+        interactions that require authorization to access specific resources.
+      flows:
+        clientCredentials:
+          tokenUrl: https://account.sendcloud.com/oauth2/token/
+          scopes:
+            api: Default OAuth scope required to access Sendcloud API.
+    AccessTokenAuth:
+      type: http
+      scheme: bearer
+      description: AccessToken <access_token>
+  parameters:
+    AccessToken:
+      name: access_token
+      in: query
+      description: >-
+        A JSON Web Token encoding either an “id” (user ID) or “iid” (integration
+        ID) property. Alternatively, a public API key.
+      schema:
+        type: string
+  responses:
+    '400':
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    description: The HTTP status code.
+                  request:
+                    type: string
+                    description: The requested API path.
+                  message:
+                    type: string
+                    description: A message providing further information about the error.
+          examples:
+            RequiredFieldMissing:
+              summary: Required field missing
+              value:
+                error:
+                  code: 400
+                  request: api/v2/service-points/
+                  message: 'country: "This field is required."'
+            AddressGeocodeFailure:
+              summary: Unable to geocode address
+              value:
+                error:
+                  code: 400
+                  request: api/v2/service-points/
+                  message: Unable to locate the specified address
+            CarrierNotEnabled:
+              summary: Requested carriers not enabled in integration settings
+              value:
+                error:
+                  code: 400
+                  request: api/v2/service-points/
+                  message: >-
+                    carrier: "This system is trying to display carriers that
+                    haven't been activated in this integration's settings:
+                    bpost, postnl"
+            RadiusWithBoundingBox:
+              summary: Radius and bounding box are mutually exclusive
+              value:
+                error:
+                  code: 400
+                  request: api/v2/service-points/
+                  message: >-
+                    non_field_errors: "Please provide either a bounding box
+                    (defined by `ne_latitude`, `ne_longitude`, `sw_latitude`,
+                    `sw_longitude`) or `radius`"
+    '404':
+      description: Not Found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    format: int32
+                    example: 404
+                    description: >-
+                      The HTTP [status
+                      code](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status)
+                  request:
+                    type: string
+                    example: api/v2/service-points/1
+                    description: The user requested path
+                  message:
+                    type: string
+                    example: The requested resource could not be found
+                    description: A message providing further information about the error.
+  schemas:
+    service-point:
+      title: ServicePoint Object
+      description: A Sendcloud service point object.
+      type: object
+      example:
+        id: 10875349
+        code: '217165'
+        is_active: true
+        shop_type: null
+        general_shop_type: servicepoint
+        extra_data:
+          partner_name: PostNL
+          sales_channel: AFHAALPUNT
+          terminal_type: NRS
+          retail_network_id: PNPNL-01
+        name: Example Parcel Shop
+        street: Voorbeeldstraat
+        house_number: '12'
+        postal_code: 5611AG
+        city: EINDHOVEN
+        latitude: '51.441444'
+        longitude: '5.475185'
+        email: ''
+        phone: ''
+        homepage: ''
+        carrier: postnl
+        country: NL
+        formatted_opening_times:
+          '0':
+            - 10:00 - 20:00
+          '1':
+            - 10:00 - 20:00
+          '2':
+            - 10:00 - 20:00
+          '3':
+            - 10:00 - 20:00
+          '4':
+            - 10:00 - 20:00
+          '5':
+            - 10:00 - 18:00
+          '6': []
+        open_tomorrow: true
+        open_upcoming_week: true
+      properties:
+        id:
+          type: integer
+          description: The unique identifier of the service point.
+        code:
+          type: string
+          description: A carrier-specific identifier for the service point.
+        is_active:
+          type: boolean
+          description: >-
+            Indicates whether the service point data was recently updated via
+            scraping within a carrier-specific expiration period.
+
+            This field reflects data freshness, not operational availability.
+
+            To check if a service point is operationally open, use
+            `open_tomorrow` or `open_upcoming_week` instead.
+        shop_type:
+          type: string
+          nullable: true
+          description: >-
+            The carrier-specific shop type classification. May be `null` if the
+            carrier does not provide this information.
+        general_shop_type:
+          type: string
+          description: >-
+            A normalized shop type indicating the general category of the
+            service point.
+
+            Carrier-specific shop types are mapped to a fixed set of values,
+            such as `servicepoint`, `locker`, `post_office`, `carrier_depot`,
+            etc.
+          nullable: true
+        extra_data:
+          type: object
+          description: >-
+            Contains carrier-specific metadata about the service point. This
+            field has no fixed structure — it may contain different fields
+            depending on the carrier, or be empty. Do not rely on any specific
+            keys being present.
+        name:
+          type: string
+          description: The name of the service point location.
+        street:
+          type: string
+          description: The street name of the service point address.
+        house_number:
+          type: string
+          description: The house number of the service point address.
+        postal_code:
+          type: string
+          description: The postal code of the service point address.
+        city:
+          type: string
+          description: The city where the service point is located.
+        latitude:
+          type: string
+          description: The geographic latitude of the service point.
+        longitude:
+          type: string
+          description: The geographic longitude of the service point.
+        email:
+          type: string
+          description: The contact email address of the service point.
+        phone:
+          type: string
+          description: The contact phone number of the service point.
+        homepage:
+          type: string
+          description: The homepage URL of the service point.
+        carrier:
+          type: string
+          example: postnl
+          description: The code of the carrier operating this service point.
+        country:
+          type: string
+          example: NL
+          description: >-
+            The country where the service point is located, formatted as an ISO
+            3166-1 alpha-2 code.
+        formatted_opening_times:
+          type: object
+          description: >-
+            The opening hours for each day of the week, keyed by day number (`0`
+            = Monday, `6` = Sunday).
+
+            Each day contains an array of time range strings. An empty array
+            indicates the service point is closed on that day.
+
+
+            This field is dynamically computed for the **current week**. It
+            takes the regular opening hours as a base and applies any exceptions
+            reported by the carrier (e.g. reduced hours or closures on
+            holidays). For example, if a service point is normally open
+            07:00–22:00 every day but has reduced hours on Christmas Eve and is
+            closed on Christmas Day, those overrides will be reflected in the
+            output for that week.
+          required:
+            - '0'
+            - '1'
+            - '2'
+            - '3'
+            - '4'
+            - '5'
+            - '6'
+          properties:
+            '0':
+              type: array
+              items:
+                type: string
+                example: 11:00 - 18:00
+            '1':
+              type: array
+              items:
+                type: string
+                example: 11:00 - 18:00
+            '2':
+              type: array
+              items:
+                type: string
+                example: 11:00 - 18:00
+            '3':
+              type: array
+              items:
+                type: string
+                example: 11:00 - 18:00
+            '4':
+              type: array
+              items:
+                type: string
+                example: 11:00 - 18:00
+            '5':
+              type: array
+              items:
+                type: string
+                example: 11:00 - 18:00
+            '6':
+              type: array
+              items:
+                type: string
+                example: 11:00 - 18:00
+        open_tomorrow:
+          type: boolean
+          description: >-
+            Indicates whether the service point will be open tomorrow based on
+            its operating schedule.
+
+            This field is calculated from `formatted_opening_times` and should
+            be used to determine operational availability.
+        open_upcoming_week:
+          type: boolean
+          description: >-
+            Indicates whether the service point will be open at least once
+            during the next 7 days.
+
+            This field is calculated from `formatted_opening_times` including
+            any schedule exceptions, and should be used to determine operational
+            availability.
+        distance:
+          type: number
+          description: >-
+            Distance between the reference point and the service point in
+            meters.
+
+            Only returned on the list endpoint when `latitude`/`longitude` or
+            `address` query parameters are provided.
+      required:
+        - id
+        - code
+        - is_active
+        - extra_data
+        - name
+        - street
+        - house_number
+        - postal_code
+        - city
+        - latitude
+        - longitude
+        - email
+        - phone
+        - homepage
+        - carrier
+        - country
+        - formatted_opening_times
+        - open_tomorrow
+        - open_upcoming_week
