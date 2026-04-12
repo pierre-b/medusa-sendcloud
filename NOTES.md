@@ -50,6 +50,26 @@ SendCloud quotes in EUR by default (and the shipping-options snapshot only lists
 
 ---
 
+## Added in cycle 04 (createFulfillment + cancelFulfillment, 2026-04-12)
+
+### Variant resolution for full customs
+
+`FulfillmentItemDTO` and `FulfillmentOrderLineItemDTO` don't expose `variant.weight`, `variant.hs_code`, or `variant.origin_country`. This cycle sends `parcel_items[]` with `description`, `quantity`, `sku`, `item_id`, and resolvable `price` — enough for EU-internal shipments. International non-EU shipments will fail at the carrier step until we resolve variants via `productModuleService` or a workflow wrapper that pre-enriches `fulfillment.data.sendcloud_items`.
+
+### Multi-collo single-parcel assumption
+
+`createFulfillment` builds `parcels: [single_parcel]`. Orders that exceed a carrier's max box weight or dimensions need multi-collo splitting (spec §8). Tracked as a dedicated cycle.
+
+### Label base64 embedding
+
+We persist `label_url` only. Admin needs live SendCloud access to download the PDF. A future `embedLabelAsBase64` option can fetch + embed for offline retrieval, at the cost of one extra HTTP call per fulfillment.
+
+### Partial customs fields on parcel_items
+
+`parcel_items[].price` requires `order.items[].unit_price` to match `line_item_id`. Items created without a matching order line item (rare, but possible in manual workflows) will ship without a price. SendCloud accepts this for EU-internal, rejects for customs.
+
+---
+
 ## Still parked
 
 ### `noopLogger` test helper duplication

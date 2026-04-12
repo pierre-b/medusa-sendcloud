@@ -20,6 +20,13 @@ export type SendCloudPluginOptions = {
   retryBaseDelayMs?: number;
   defaultFromCountryCode?: string;
   weightUnit?: SendCloudWeightUnitOption;
+  defaultExportReason?: SendCloudExportReasonOption;
 };
 
 export type SendCloudWeightUnitOption = "g" | "kg" | "lbs" | "oz";
+
+export type SendCloudExportReasonOption =
+  | "gift"
+  | "documents"
+  | "commercial_goods"
+  | "commercial_sample";

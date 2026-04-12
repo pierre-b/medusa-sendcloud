@@ -5,8 +5,12 @@ import {
 import type {
   CalculatedShippingOptionPrice,
   CalculateShippingOptionPriceDTO,
+  CreateFulfillmentResult,
   CreateShippingOptionDTO,
+  FulfillmentDTO,
+  FulfillmentItemDTO,
   FulfillmentOption,
+  FulfillmentOrderDTO,
   Logger,
   ValidateFulfillmentDataContext,
 } from "@medusajs/framework/types";
@@ -14,12 +18,17 @@ import type {
 import { SendCloudClient } from "../../services/sendcloud-client";
 import type { SendCloudPluginOptions } from "../../types/plugin-options";
 import type {
+  SendCloudShipmentCancelResponse,
+  SendCloudShipmentRequest,
+  SendCloudShipmentResponse,
   SendCloudShippingOption,
   SendCloudShippingOptionsFilter,
   SendCloudShippingOptionsResponse,
 } from "../../types/sendcloud-api";
 import {
   aggregateParcel,
+  buildShipmentParcel,
+  buildToAddress,
   isValidServicePointId,
   readSendCloudCode,
   requireString,
@@ -30,6 +39,9 @@ type InjectedDependencies = {
 };
 
 const SHIPPING_OPTIONS_PATH = "/api/v3/shipping-options";
+const SHIPMENTS_WITH_RULES_PATH =
+  "/api/v3/shipments/announce-with-shipping-rules";
+const DEFAULT_EXPORT_REASON = "commercial_goods" as const;
 
 export class SendCloudFulfillmentProvider extends AbstractFulfillmentProviderService {
   static identifier = "sendcloud";
@@ -164,6 +176,111 @@ export class SendCloudFulfillmentProvider extends AbstractFulfillmentProviderSer
     return {
       calculated_amount: totalValue,
       is_calculated_price_tax_inclusive: false,
+    };
+  }
+
+  async createFulfillment(
+    data: Record<string, unknown>,
+    items: Partial<Omit<FulfillmentItemDTO, "fulfillment">>[],
+    order: Partial<FulfillmentOrderDTO> | undefined,
+    fulfillment: Partial<Omit<FulfillmentDTO, "provider_id" | "data" | "items">>
+  ): Promise<CreateFulfillmentResult> {
+    const code = readSendCloudCode(data);
+    const rawAddress = fulfillment?.delivery_address ?? order?.shipping_address;
+    const toAddress = buildToAddress(rawAddress);
+
+    const parcel = buildShipmentParcel(
+      items as FulfillmentItemDTO[] | undefined,
+      order,
+      { insuranceAmount: this.options_.defaultInsuranceAmount }
+    );
+
+    const orderReference =
+      order?.display_id !== undefined && order?.display_id !== null
+        ? String(order.display_id)
+        : (order?.id ?? undefined);
+    const exportReason =
+      this.options_.defaultExportReason ?? DEFAULT_EXPORT_REASON;
+
+    const payload: SendCloudShipmentRequest = {
+      to_address: toAddress,
+      ship_with: {
+        type: "shipping_option_code",
+        properties: { shipping_option_code: code },
+      },
+      apply_shipping_defaults: true,
+      apply_shipping_rules: true,
+      parcels: [parcel],
+      customs_information: {
+        export_reason: exportReason,
+        ...(orderReference ? { invoice_number: orderReference } : {}),
+      },
+    };
+
+    if (orderReference) payload.order_number = orderReference;
+    if (fulfillment?.id) payload.external_reference_id = fulfillment.id;
+
+    const servicePointId = data.sendcloud_service_point_id;
+    if (isValidServicePointId(servicePointId)) {
+      payload.to_service_point = { id: String(servicePointId) };
+    }
+
+    const response = await this.client_.request<SendCloudShipmentResponse>({
+      method: "POST",
+      path: SHIPMENTS_WITH_RULES_PATH,
+      body: payload,
+    });
+
+    const shipment = response.data;
+    const firstParcel = shipment?.parcels?.[0];
+    if (!shipment?.id || !firstParcel) {
+      throw new MedusaError(
+        MedusaError.Types.UNEXPECTED_STATE,
+        "medusa-sendcloud: SendCloud returned no parcel for the shipment"
+      );
+    }
+
+    const labelLink =
+      firstParcel.documents?.find((doc) => doc.type === "label")?.link ?? null;
+
+    return {
+      data: {
+        sendcloud_shipment_id: shipment.id,
+        sendcloud_parcel_id: firstParcel.id,
+        tracking_number: firstParcel.tracking_number,
+        tracking_url: firstParcel.tracking_url,
+        status: firstParcel.status,
+        label_url: labelLink,
+        announced_at: firstParcel.announced_at ?? null,
+        applied_shipping_rules: shipment.applied_shipping_rules ?? [],
+      },
+      labels: [
+        {
+          tracking_number: firstParcel.tracking_number,
+          tracking_url: firstParcel.tracking_url,
+          label_url: labelLink ?? "",
+        },
+      ],
+    };
+  }
+
+  async cancelFulfillment(data: Record<string, unknown>): Promise<any> {
+    const shipmentId = requireString(
+      data.sendcloud_shipment_id,
+      "data.sendcloud_shipment_id"
+    );
+
+    const response =
+      await this.client_.request<SendCloudShipmentCancelResponse>({
+        method: "POST",
+        path: `/api/v3/shipments/${encodeURIComponent(shipmentId)}/cancel`,
+      });
+
+    return {
+      sendcloud_cancellation: {
+        status: response.data.status,
+        message: response.data.message,
+      },
     };
   }
 

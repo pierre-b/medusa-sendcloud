@@ -669,7 +669,362 @@ describe("SendCloudFulfillmentProvider", () => {
     });
   });
 
+  describe("createFulfillment", () => {
+    const SHIPMENTS_PATH = "/api/v3/shipments/announce-with-shipping-rules";
+
+    const fulfillmentData = {
+      sendcloud_code: sampleOption.code,
+    };
+
+    const fulfillmentItems = [
+      {
+        id: "fitem_1",
+        title: "Bar of Chocolate",
+        quantity: 2,
+        sku: "BAR-001",
+        barcode: "1234567890",
+        line_item_id: "li_1",
+        inventory_item_id: null,
+      },
+    ] as unknown as Parameters<
+      SendCloudFulfillmentProvider["createFulfillment"]
+    >[1];
+
+    const orderFixture = {
+      id: "order_1",
+      display_id: 42,
+      currency_code: "EUR",
+      total: 1850,
+      shipping_address: {
+        first_name: "Jane",
+        last_name: "Doe",
+        company: "Acme",
+        address_1: "Stadhuisplein",
+        address_2: "Apartment 17B",
+        city: "Eindhoven",
+        country_code: "NL",
+        postal_code: "1013 AB",
+        phone: "+31988172999",
+      },
+      items: [
+        {
+          id: "li_1",
+          title: "Bar of Chocolate",
+          unit_price: 925,
+          quantity: 2,
+          variant_sku: "BAR-001",
+          product_title: "Dark chocolate bar",
+        },
+      ],
+    } as unknown as Parameters<
+      SendCloudFulfillmentProvider["createFulfillment"]
+    >[2];
+
+    const fulfillmentFixture = {
+      id: "ful_1",
+      delivery_address: orderFixture?.shipping_address,
+    } as unknown as Parameters<
+      SendCloudFulfillmentProvider["createFulfillment"]
+    >[3];
+
+    const shipmentResponse = {
+      data: {
+        id: "XXX-Shipment-id",
+        parcels: [
+          {
+            id: 383707309,
+            status: { code: "READY_TO_SEND", message: "Ready to send" },
+            documents: [
+              {
+                type: "label",
+                size: "a6",
+                link: "https://panel.sendcloud.sc/api/v3/parcels/383707309/documents/label",
+              },
+            ],
+            tracking_number: "3SYZXG8498635",
+            tracking_url:
+              "https://tracking.eu-central-1-0.sendcloud.sc/forward?carrier=postnl",
+            announced_at: "2024-06-06T17:11:14.712398Z",
+          },
+        ],
+        label_details: { mime_type: "application/pdf", dpi: 72 },
+        applied_shipping_rules: [],
+      },
+    };
+
+    const buildProvider = (
+      extra: Partial<
+        ConstructorParameters<typeof SendCloudFulfillmentProvider>[1]
+      > = {}
+    ) =>
+      new SendCloudFulfillmentProvider(
+        { logger: noopLogger },
+        { ...validOptions, retryBaseDelayMs: 0, weightUnit: "g", ...extra }
+      );
+
+    it("POSTs /shipments/announce-with-shipping-rules and returns tracking + label", async () => {
+      let capturedBody: Record<string, unknown> | undefined;
+      nock(BASE)
+        .post(SHIPMENTS_PATH, (body) => {
+          capturedBody = body as Record<string, unknown>;
+          return true;
+        })
+        .reply(201, shipmentResponse);
+
+      const result = await buildProvider().createFulfillment(
+        fulfillmentData,
+        fulfillmentItems,
+        orderFixture,
+        fulfillmentFixture
+      );
+
+      expect(capturedBody).toMatchObject({
+        ship_with: {
+          type: "shipping_option_code",
+          properties: { shipping_option_code: sampleOption.code },
+        },
+        to_address: {
+          name: "Jane Doe",
+          company_name: "Acme",
+          address_line_1: "Stadhuisplein",
+          address_line_2: "Apartment 17B",
+          city: "Eindhoven",
+          postal_code: "1013 AB",
+          country_code: "NL",
+          phone_number: "+31988172999",
+        },
+        apply_shipping_rules: true,
+        apply_shipping_defaults: true,
+        order_number: "42",
+        external_reference_id: "ful_1",
+        customs_information: {
+          invoice_number: "42",
+          export_reason: "commercial_goods",
+        },
+      });
+
+      expect(result.data).toMatchObject({
+        sendcloud_shipment_id: "XXX-Shipment-id",
+        sendcloud_parcel_id: 383707309,
+        tracking_number: "3SYZXG8498635",
+        status: { code: "READY_TO_SEND", message: "Ready to send" },
+      });
+      expect(result.labels).toEqual([
+        {
+          tracking_number: "3SYZXG8498635",
+          tracking_url:
+            "https://tracking.eu-central-1-0.sendcloud.sc/forward?carrier=postnl",
+          label_url:
+            "https://panel.sendcloud.sc/api/v3/parcels/383707309/documents/label",
+        },
+      ]);
+    });
+
+    it("forwards sendcloud_service_point_id as to_service_point.id", async () => {
+      let capturedBody: Record<string, unknown> | undefined;
+      nock(BASE)
+        .post(SHIPMENTS_PATH, (body) => {
+          capturedBody = body as Record<string, unknown>;
+          return true;
+        })
+        .reply(201, shipmentResponse);
+
+      await buildProvider().createFulfillment(
+        { ...fulfillmentData, sendcloud_service_point_id: "12345" },
+        fulfillmentItems,
+        orderFixture,
+        fulfillmentFixture
+      );
+
+      expect(capturedBody).toMatchObject({
+        to_service_point: { id: "12345" },
+      });
+    });
+
+    it("attaches additional_insured_price when defaultInsuranceAmount is configured", async () => {
+      let capturedBody: Record<string, unknown> | undefined;
+      nock(BASE)
+        .post(SHIPMENTS_PATH, (body) => {
+          capturedBody = body as Record<string, unknown>;
+          return true;
+        })
+        .reply(201, shipmentResponse);
+
+      await buildProvider({ defaultInsuranceAmount: 50 }).createFulfillment(
+        fulfillmentData,
+        fulfillmentItems,
+        orderFixture,
+        fulfillmentFixture
+      );
+
+      const parcel = (
+        capturedBody as { parcels: Array<Record<string, unknown>> }
+      ).parcels[0];
+      expect(parcel.additional_insured_price).toEqual({
+        value: "50",
+        currency: "EUR",
+      });
+    });
+
+    it("respects a custom defaultExportReason plugin option", async () => {
+      let capturedBody: Record<string, unknown> | undefined;
+      nock(BASE)
+        .post(SHIPMENTS_PATH, (body) => {
+          capturedBody = body as Record<string, unknown>;
+          return true;
+        })
+        .reply(201, shipmentResponse);
+
+      await buildProvider({ defaultExportReason: "gift" }).createFulfillment(
+        fulfillmentData,
+        fulfillmentItems,
+        orderFixture,
+        fulfillmentFixture
+      );
+
+      expect(capturedBody).toMatchObject({
+        customs_information: { export_reason: "gift" },
+      });
+    });
+
+    it("throws INVALID_DATA when sendcloud_code is missing", async () => {
+      await expect(
+        buildProvider().createFulfillment(
+          {},
+          fulfillmentItems,
+          orderFixture,
+          fulfillmentFixture
+        )
+      ).rejects.toMatchObject({
+        type: MedusaError.Types.INVALID_DATA,
+        message: expect.stringMatching(/sendcloud_code/),
+      });
+    });
+
+    it("throws INVALID_DATA when shipping address is missing required fields", async () => {
+      const brokenOrder = {
+        ...orderFixture,
+        shipping_address: { first_name: "Jane" },
+      } as unknown as typeof orderFixture;
+
+      await expect(
+        buildProvider().createFulfillment(
+          fulfillmentData,
+          fulfillmentItems,
+          brokenOrder,
+          {
+            ...fulfillmentFixture,
+            delivery_address: { first_name: "Jane" },
+          } as unknown as typeof fulfillmentFixture
+        )
+      ).rejects.toMatchObject({
+        type: MedusaError.Types.INVALID_DATA,
+        message: expect.stringMatching(
+          /address_line_1|postal_code|city|country_code/
+        ),
+      });
+    });
+
+    it("throws UNEXPECTED_STATE when SendCloud response has no parcels", async () => {
+      nock(BASE)
+        .post(SHIPMENTS_PATH)
+        .reply(201, { data: { id: "s_1", parcels: [] } });
+
+      await expect(
+        buildProvider().createFulfillment(
+          fulfillmentData,
+          fulfillmentItems,
+          orderFixture,
+          fulfillmentFixture
+        )
+      ).rejects.toMatchObject({
+        type: MedusaError.Types.UNEXPECTED_STATE,
+      });
+    });
+  });
+
+  describe("cancelFulfillment", () => {
+    const buildProvider = () =>
+      new SendCloudFulfillmentProvider(
+        { logger: noopLogger },
+        { ...validOptions, retryBaseDelayMs: 0 }
+      );
+
+    it("returns sendcloud_cancellation when SendCloud responds 200", async () => {
+      nock(BASE)
+        .post("/api/v3/shipments/ship_1/cancel")
+        .reply(200, {
+          data: {
+            status: "cancelled",
+            message: "Shipment has been cancelled",
+          },
+        });
+
+      const result = await buildProvider().cancelFulfillment({
+        sendcloud_shipment_id: "ship_1",
+      });
+
+      expect(result).toEqual({
+        sendcloud_cancellation: {
+          status: "cancelled",
+          message: "Shipment has been cancelled",
+        },
+      });
+    });
+
+    it("accepts 202 queued as a success", async () => {
+      nock(BASE)
+        .post("/api/v3/shipments/ship_1/cancel")
+        .reply(202, {
+          data: {
+            status: "queued",
+            message: "Shipment cancellation has been queued",
+          },
+        });
+
+      const result = await buildProvider().cancelFulfillment({
+        sendcloud_shipment_id: "ship_1",
+      });
+
+      expect(result).toEqual({
+        sendcloud_cancellation: {
+          status: "queued",
+          message: "Shipment cancellation has been queued",
+        },
+      });
+    });
+
+    it("throws CONFLICT on 409 from SendCloud", async () => {
+      nock(BASE)
+        .post("/api/v3/shipments/ship_1/cancel")
+        .reply(409, {
+          errors: [
+            {
+              status: "409",
+              code: "invalid",
+              detail: "Shipment already cancelled",
+            },
+          ],
+        });
+
+      await expect(
+        buildProvider().cancelFulfillment({ sendcloud_shipment_id: "ship_1" })
+      ).rejects.toMatchObject({
+        type: MedusaError.Types.CONFLICT,
+      });
+    });
+
+    it("throws INVALID_DATA when sendcloud_shipment_id missing", async () => {
+      await expect(buildProvider().cancelFulfillment({})).rejects.toMatchObject(
+        {
+          type: MedusaError.Types.INVALID_DATA,
+          message: expect.stringMatching(/sendcloud_shipment_id/),
+        }
+      );
+    });
+  });
+
   describe("next cycle", () => {
-    it.todo("createFulfillment — §3.6");
+    it.todo("createReturnFulfillment — §3.8");
   });
 });

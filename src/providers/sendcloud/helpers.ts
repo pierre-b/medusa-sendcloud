@@ -1,8 +1,17 @@
 import { MedusaError } from "@medusajs/framework/utils";
-import type { CalculateShippingOptionPriceDTO } from "@medusajs/framework/types";
+import type {
+  CalculateShippingOptionPriceDTO,
+  FulfillmentItemDTO,
+  FulfillmentOrderDTO,
+} from "@medusajs/framework/types";
 
 import type { SendCloudWeightUnitOption } from "../../types/plugin-options";
-import type { SendCloudShippingOptionsFilter } from "../../types/sendcloud-api";
+import type {
+  SendCloudAddress,
+  SendCloudParcelItemRequest,
+  SendCloudParcelRequest,
+  SendCloudShippingOptionsFilter,
+} from "../../types/sendcloud-api";
 
 export const readSendCloudCode = (data: Record<string, unknown>): string => {
   const code = data.sendcloud_code;
@@ -52,6 +61,120 @@ export const convertToKg = (
 export type ParcelShape = NonNullable<
   SendCloudShippingOptionsFilter["parcels"]
 >[number];
+
+const readOptionalString = (value: unknown): string | undefined => {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed.length === 0 ? undefined : value;
+};
+
+export const buildToAddress = (rawAddress: unknown): SendCloudAddress => {
+  if (!rawAddress || typeof rawAddress !== "object") {
+    throw new MedusaError(
+      MedusaError.Types.INVALID_DATA,
+      "medusa-sendcloud: shipping address is required to create a fulfillment"
+    );
+  }
+  const a = rawAddress as Record<string, unknown>;
+
+  const firstName = readOptionalString(a.first_name) ?? "";
+  const lastName = readOptionalString(a.last_name) ?? "";
+  const name = `${firstName} ${lastName}`.trim();
+  if (name.length === 0) {
+    throw new MedusaError(
+      MedusaError.Types.INVALID_DATA,
+      "medusa-sendcloud: shipping address name (first_name + last_name) is required"
+    );
+  }
+
+  const addressLine1 = requireString(a.address_1, "to_address.address_line_1");
+  const postalCode = requireString(a.postal_code, "to_address.postal_code");
+  const city = requireString(a.city, "to_address.city");
+  const countryCode = requireString(a.country_code, "to_address.country_code");
+
+  const result: SendCloudAddress = {
+    name,
+    address_line_1: addressLine1,
+    postal_code: postalCode,
+    city,
+    country_code: countryCode,
+  };
+
+  const company = readOptionalString(a.company);
+  if (company) result.company_name = company;
+
+  const addressLine2 = readOptionalString(a.address_2);
+  if (addressLine2) result.address_line_2 = addressLine2;
+
+  const province = readOptionalString(a.province);
+  if (province) result.state_province_code = province;
+
+  const phone = readOptionalString(a.phone);
+  if (phone) result.phone_number = phone;
+
+  const email = readOptionalString(a.email);
+  if (email) result.email = email;
+
+  return result;
+};
+
+export const buildParcelItems = (
+  items: FulfillmentItemDTO[] | undefined,
+  order: Partial<FulfillmentOrderDTO> | undefined
+): SendCloudParcelItemRequest[] => {
+  if (!items || items.length === 0) return [];
+
+  const lineItemPriceById = new Map<string, { unit_price: number }>();
+  const currency = order?.currency_code;
+  for (const lineItem of order?.items ?? []) {
+    if (lineItem?.id && typeof lineItem.unit_price === "number") {
+      lineItemPriceById.set(lineItem.id, { unit_price: lineItem.unit_price });
+    }
+  }
+
+  return items.map((item) => {
+    const entry: SendCloudParcelItemRequest = {
+      description: item.title ?? "",
+      quantity: Number(item.quantity ?? 0),
+    };
+    if (item.sku) entry.sku = item.sku;
+    if (item.id) entry.item_id = item.id;
+
+    const matching = item.line_item_id
+      ? lineItemPriceById.get(item.line_item_id)
+      : undefined;
+    if (matching && currency) {
+      entry.price = {
+        value: String(matching.unit_price),
+        currency: currency as "EUR" | "GBP" | "USD",
+      };
+    }
+    return entry;
+  });
+};
+
+export const buildShipmentParcel = (
+  items: FulfillmentItemDTO[] | undefined,
+  order: Partial<FulfillmentOrderDTO> | undefined,
+  opts: { insuranceAmount?: number }
+): SendCloudParcelRequest => {
+  const parcel: SendCloudParcelRequest = {};
+  const parcelItems = buildParcelItems(items, order);
+  if (parcelItems.length > 0) {
+    parcel.parcel_items = parcelItems;
+  }
+  if (
+    typeof opts.insuranceAmount === "number" &&
+    Number.isFinite(opts.insuranceAmount) &&
+    opts.insuranceAmount > 0
+  ) {
+    parcel.additional_insured_price = {
+      value: String(opts.insuranceAmount),
+      currency: "EUR",
+    };
+  }
+  return parcel;
+};
 
 export const aggregateParcel = (
   items: CalculateShippingOptionPriceDTO["context"]["items"] | undefined,
