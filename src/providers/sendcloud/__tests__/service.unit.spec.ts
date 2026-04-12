@@ -1424,6 +1424,6 @@ describe("SendCloudFulfillmentProvider", () => {
   });
 
   describe("next cycle", () => {
-    it.todo("admin settings widget — §15.1");
+    it.todo("multi-collo parcel splitting — §8");
   });
 });

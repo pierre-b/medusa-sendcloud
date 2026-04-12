@@ -50,6 +50,30 @@ SendCloud quotes in EUR by default (and the shipping-options snapshot only lists
 
 ---
 
+## Added in cycle 11 (admin settings dashboard, 2026-04-12)
+
+### Default sender-address selector deferred
+
+Spec §15.1 also lists a dropdown to pick a default SendCloud sender address. Implementing that needs a persistent plugin-settings store (we don't have one yet — plugin options only come from `medusa-config.ts` at boot). Same story for label-format / label-size preferences. Park until we stand up a settings module.
+
+### No admin-side unit tests
+
+Medusa admin UI testing requires a Vite + Playwright (or React Testing Library + jsdom-compatible admin harness) stack we haven't set up. The React page is a thin wrapper over `/admin/sendcloud/dashboard`, which has 4 backend unit cases (happy path, 401 credentials, provider not registered, upstream 5xx). Deferred until a second admin route lands and the infra cost amortizes.
+
+### Refresh = test-connection
+
+No dedicated "Test connection" button. The initial `useQuery` fetch IS the connection test; `refetch()` on the "Refresh" button is the retry. If SendCloud credentials are rotated, admins click refresh and the dashboard flips green.
+
+### Webhook URL is client-computed
+
+`${window.location.origin}/webhooks/sendcloud` is built in the browser — whatever host the admin is hitting (local.chocolateriedunouveaumonde.com, staging, prod) is exactly the host SendCloud should POST back to. No backend plumbing for the URL. Trade-off: if the admin ever runs on a different hostname than the API (e.g. split admin CDN), this URL becomes wrong. Not a concern today; revisit if we ever split the admin out.
+
+### `fp_sendcloud_sendcloud` container key assumption (reinforced)
+
+Dashboard route resolves the provider via `buildProviderRegistrationKey("sendcloud")` → `fp_sendcloud_sendcloud`. Same fragility flagged in cycle 07: if Medusa renames the base-class convention across versions, this breaks. Keep the helper centralized so the fix is one-file.
+
+---
+
 ## Added in cycle 10 (per-fulfillment label shortcut, 2026-04-12)
 
 ### ✅ Extracted `buildProviderRegistrationKey` to `registration.ts`
