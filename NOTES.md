@@ -50,6 +50,26 @@ SendCloud quotes in EUR by default (and the shipping-options snapshot only lists
 
 ---
 
+## Added in cycle 08 (service-point lookup, 2026-04-12)
+
+### No TTL cache on service-point lookups
+
+Per SendCloud spec §5.3, service-point IDs are ephemeral — caching beyond a minute or two is incorrect. A future cycle could add a request-scoped in-memory cache (dedupe identical query params within a single HTTP request) but nothing longer-lived.
+
+### Narrow query-param allowlist
+
+Forwards `country`, `postal_code`, `city`, `house_number`, `radius`, `carrier`, `latitude`, `longitude` only. SendCloud accepts ~18 params; the others (`ne_*`, `sw_*`, `pudo_id`, `weight`, `shop_type`, `general_shop_type`, `access_token`) land on demand.
+
+### Basic Auth only
+
+OAuth2 + `access_token` alt auth modes supported by SendCloud aren't wired. Basic Auth reuses the plugin's `publicKey`/`privateKey`.
+
+### No route-level integration test
+
+`parseServicePointsQuery` + `fetchSendcloudServicePoints` are unit-tested with `nock`. The route file is a thin wrapper and not covered by `medusaIntegrationTestRunner` — would require booting Postgres on CI.
+
+---
+
 ## Added in cycle 07 (webhook parcel_status_changed + refund_requested, 2026-04-12)
 
 ### Integration-lifecycle events log-and-ignore

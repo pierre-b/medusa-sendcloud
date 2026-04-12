@@ -261,6 +261,42 @@ export type SendCloudShipmentCancelResponse = {
   };
 };
 
+export type SendCloudServicePointsQuery = {
+  country: string;
+  postal_code?: string;
+  city?: string;
+  house_number?: string;
+  radius?: number;
+  carrier?: string;
+  latitude?: string;
+  longitude?: string;
+};
+
+export type SendCloudServicePoint = {
+  id: number;
+  code: string;
+  name: string;
+  street: string;
+  house_number: string;
+  postal_code: string;
+  city: string;
+  latitude: string;
+  longitude: string;
+  email?: string;
+  phone?: string;
+  homepage?: string;
+  carrier: string;
+  country: string;
+  formatted_opening_times?: Record<string, string[]>;
+  open_tomorrow?: boolean;
+  open_upcoming_week?: boolean;
+  distance?: number;
+  is_active?: boolean;
+  shop_type?: string | null;
+  general_shop_type?: string | null;
+  extra_data?: Record<string, unknown>;
+};
+
 export type SendcloudWebhookParcelStatus = {
   id: number;
   message: string;

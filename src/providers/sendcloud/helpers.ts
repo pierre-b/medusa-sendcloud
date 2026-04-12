@@ -12,10 +12,65 @@ import type {
   SendCloudAddress,
   SendCloudParcelItemRequest,
   SendCloudParcelRequest,
+  SendCloudServicePointsQuery,
   SendCloudShippingOptionsFilter,
   SendCloudVariantCustomsEntry,
   SendCloudVariantsMap,
 } from "../../types/sendcloud-api";
+
+export type ParsedServicePointsQuery =
+  | { ok: true; value: SendCloudServicePointsQuery }
+  | { ok: false; error: string };
+
+const SERVICE_POINTS_STRING_FIELDS = [
+  "postal_code",
+  "city",
+  "house_number",
+  "carrier",
+  "latitude",
+  "longitude",
+] as const;
+
+export const parseServicePointsQuery = (
+  raw: Record<string, unknown> | undefined | null
+): ParsedServicePointsQuery => {
+  const rawInput = raw ?? {};
+  const countryRaw = rawInput.country;
+  if (typeof countryRaw !== "string" || countryRaw.trim().length === 0) {
+    return {
+      ok: false,
+      error: "medusa-sendcloud: query.country is required (ISO 3166-1 alpha-2)",
+    };
+  }
+  const countryTrimmed = countryRaw.trim();
+  if (countryTrimmed.length !== 2) {
+    return {
+      ok: false,
+      error: "medusa-sendcloud: query.country must be a 2-letter ISO code",
+    };
+  }
+
+  const value: SendCloudServicePointsQuery = {
+    country: countryTrimmed.toUpperCase(),
+  };
+
+  for (const field of SERVICE_POINTS_STRING_FIELDS) {
+    const candidate = rawInput[field];
+    if (typeof candidate === "string" && candidate.trim().length > 0) {
+      value[field] = candidate.trim();
+    }
+  }
+
+  const radiusRaw = rawInput.radius;
+  if (radiusRaw !== undefined && radiusRaw !== null && radiusRaw !== "") {
+    const parsed = Number(radiusRaw);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      value.radius = Math.trunc(parsed);
+    }
+  }
+
+  return { ok: true, value };
+};
 
 export const verifySendcloudSignature = (
   rawBody: Buffer | string,

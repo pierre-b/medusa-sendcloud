@@ -13,6 +13,7 @@ Each feature landed in this plugin gets its own page here. The index is the auth
 - [Variant customs resolution](./variant-customs-resolution.md) — `order.placed` subscriber enriches `order.metadata.sendcloud_variants` so `createFulfillment` can populate `hs_code`, `origin_country`, per-item weight
 - [Create return fulfillment — `createReturnFulfillment` (§3.8)](./create-return-fulfillment.md) — inverted-address return parcel via `/api/v3/returns/announce-synchronously`
 - [Webhook sync — `parcel_status_changed` + `refund_requested` (§4)](./webhook-sync.md) — HMAC-verified SendCloud → Medusa tracking lifecycle + delivered/exception flags
+- [Service-point lookup — `GET /store/sendcloud/service-points` (§5)](./service-points.md) — storefront PUDO pickup-point search proxied to `servicepoints.sendcloud.sc`
 
 ## OpenAPI snapshots
 
@@ -21,6 +22,7 @@ Vendor-authoritative copies of the SendCloud v3 specs the plugin relies on. Kept
 - [`openapi-snapshots/shipping-options.yaml`](./openapi-snapshots/shipping-options.yaml) — `POST /api/v3/shipping-options`, used by §3.1 / §3.2 / §3.4
 - [`openapi-snapshots/shipments.yaml`](./openapi-snapshots/shipments.yaml) — `POST /api/v3/shipments/announce-with-shipping-rules` + `/cancel`, used by §3.6 / §3.7
 - [`openapi-snapshots/returns.yaml`](./openapi-snapshots/returns.yaml) — `POST /api/v3/returns/announce-synchronously`, used by §3.8
+- [`openapi-snapshots/service-points.yaml`](./openapi-snapshots/service-points.yaml) — v2 `/service-points` on `servicepoints.sendcloud.sc`, used by §5
 
 ## Planning
 
@@ -31,7 +33,8 @@ Vendor-authoritative copies of the SendCloud v3 specs the plugin relies on. Kept
 - [`plans/05-variant-resolution-for-customs.md`](./plans/05-variant-resolution-for-customs.md) — cycle 05: variant customs resolution via subscriber
 - [`plans/06-create-return-fulfillment.md`](./plans/06-create-return-fulfillment.md) — cycle 06: `createReturnFulfillment`
 - [`plans/07-webhook-parcel-status-sync.md`](./plans/07-webhook-parcel-status-sync.md) — cycle 07: `parcel_status_changed` + `refund_requested` webhook
+- [`plans/08-service-point-lookup.md`](./plans/08-service-point-lookup.md) — cycle 08: storefront service-point proxy
 
 ## Roadmap
 
-See `../../chocolaterie/docs/medusa-sendcloud-plugin-spec.md` §19 for the full feature checklist (P0 → P3). P0 is now complete. Next cycle: §5 service-point lookup — storefront route that proxies SendCloud's service-point API for PUDO pickup-selection UX.
+See `../../chocolaterie/docs/medusa-sendcloud-plugin-spec.md` §19 for the full feature checklist (P0 → P3). P0 complete; now into P1. Next cycle: bulk label download (§6.3) or admin settings widget (§15.1) — pick based on operational priority.

@@ -1424,6 +1424,6 @@ describe("SendCloudFulfillmentProvider", () => {
   });
 
   describe("next cycle", () => {
-    it.todo("service-point lookup storefront route — §5");
+    it.todo("bulk label download — §6.3");
   });
 });

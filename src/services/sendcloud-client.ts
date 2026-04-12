@@ -24,6 +24,13 @@ export type SendCloudRequestInit = {
   path: string;
   body?: unknown;
   query?: Record<string, string | number | boolean | undefined>;
+  /**
+   * Per-request override of the SendCloud base URL. Used when a feature
+   * hits a different SendCloud subdomain (e.g. `servicepoints.sendcloud.sc`
+   * for the v2 service-points API). Falls back to the client's configured
+   * baseUrl when not set.
+   */
+  baseUrl?: string;
 };
 
 const RETRYABLE_STATUS = new Set<number>([429]);
@@ -125,9 +132,10 @@ export class SendCloudClient {
 
   private buildUrl(
     path: string,
-    query?: SendCloudRequestInit["query"]
+    query?: SendCloudRequestInit["query"],
+    baseUrlOverride?: string
   ): string {
-    const url = new URL(path, this.baseUrl);
+    const url = new URL(path, baseUrlOverride ?? this.baseUrl);
     if (query) {
       for (const [key, value] of Object.entries(query)) {
         if (value !== undefined) {
@@ -139,7 +147,7 @@ export class SendCloudClient {
   }
 
   async request<T = unknown>(init: SendCloudRequestInit): Promise<T> {
-    const url = this.buildUrl(init.path, init.query);
+    const url = this.buildUrl(init.path, init.query, init.baseUrl);
     const headers: Record<string, string> = {
       authorization: this.buildAuthHeader(),
       accept: "application/json",
