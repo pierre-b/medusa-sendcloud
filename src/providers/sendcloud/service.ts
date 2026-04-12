@@ -30,14 +30,18 @@ import type {
 } from "../../types/sendcloud-api";
 import {
   aggregateParcel,
+  applyHintDimensions,
+  buildParcelFromHint,
   buildParcelItems,
   buildShipmentParcel,
   buildToAddress,
   isValidServicePointId,
+  parseParcelsHint,
   readSendCloudCode,
   readSendcloudVariantsFromOrder,
   requireString,
 } from "./helpers";
+import { assertCarrierSupportsMulticollo } from "./multicollo";
 
 type InjectedDependencies = {
   logger: Logger;
@@ -194,16 +198,36 @@ export class SendCloudFulfillmentProvider extends AbstractFulfillmentProviderSer
     const code = readSendCloudCode(data);
     const rawAddress = fulfillment?.delivery_address ?? order?.shipping_address;
     const toAddress = buildToAddress(rawAddress);
+    const weightUnit = this.options_.weightUnit ?? "g";
 
-    const parcel = buildShipmentParcel(
+    const parcelsHint = parseParcelsHint(
+      (fulfillment?.metadata as Record<string, unknown> | undefined)
+        ?.sendcloud_parcels
+    );
+    const isMulticollo = (parcelsHint?.length ?? 0) > 1;
+
+    if (isMulticollo) {
+      await assertCarrierSupportsMulticollo(this.client_, code);
+    }
+
+    const primaryParcel = buildShipmentParcel(
       items as FulfillmentItemDTO[] | undefined,
       order,
       {
         insuranceAmount: this.options_.defaultInsuranceAmount,
         variantsMap: readSendcloudVariantsFromOrder(order),
-        weightUnit: this.options_.weightUnit ?? "g",
+        weightUnit,
       }
     );
+
+    const parcels = parcelsHint
+      ? [
+          applyHintDimensions(primaryParcel, parcelsHint[0], weightUnit),
+          ...parcelsHint
+            .slice(1)
+            .map((hint) => buildParcelFromHint(hint, weightUnit)),
+        ]
+      : [primaryParcel];
 
     const orderReference =
       order?.display_id !== undefined && order?.display_id !== null
@@ -220,7 +244,7 @@ export class SendCloudFulfillmentProvider extends AbstractFulfillmentProviderSer
       },
       apply_shipping_defaults: true,
       apply_shipping_rules: true,
-      parcels: [parcel],
+      parcels,
       customs_information: {
         export_reason: exportReason,
         ...(orderReference ? { invoice_number: orderReference } : {}),
@@ -250,21 +274,48 @@ export class SendCloudFulfillmentProvider extends AbstractFulfillmentProviderSer
       );
     }
 
-    const labelLink =
-      firstParcel.documents?.find((doc) => doc.type === "label")?.link ?? null;
+    const readLabel = (
+      parcel: NonNullable<SendCloudShipmentResponse["data"]>["parcels"][number]
+    ) => parcel.documents?.find((doc) => doc.type === "label")?.link ?? null;
 
-    return {
-      data: {
-        sendcloud_shipment_id: shipment.id,
-        sendcloud_parcel_id: firstParcel.id,
-        tracking_number: firstParcel.tracking_number,
-        tracking_url: firstParcel.tracking_url,
-        status: firstParcel.status,
-        label_url: labelLink,
-        announced_at: firstParcel.announced_at ?? null,
-        applied_shipping_rules: shipment.applied_shipping_rules ?? [],
-      },
-      labels: labelLink
+    const labelLink = readLabel(firstParcel);
+    const responseParcels = shipment.parcels ?? [];
+    const baseData: Record<string, unknown> = {
+      sendcloud_shipment_id: shipment.id,
+      sendcloud_parcel_id: firstParcel.id,
+      tracking_number: firstParcel.tracking_number,
+      tracking_url: firstParcel.tracking_url,
+      status: firstParcel.status,
+      label_url: labelLink,
+      announced_at: firstParcel.announced_at ?? null,
+      applied_shipping_rules: shipment.applied_shipping_rules ?? [],
+    };
+
+    if (isMulticollo) {
+      baseData.is_multicollo = true;
+      baseData.parcels = responseParcels.map((parcel) => ({
+        sendcloud_parcel_id: parcel.id,
+        tracking_number: parcel.tracking_number,
+        tracking_url: parcel.tracking_url,
+        status: parcel.status ?? null,
+        label_url: readLabel(parcel),
+      }));
+      baseData.aggregate_status = "pending";
+    }
+
+    const labels = isMulticollo
+      ? responseParcels
+          .map((parcel) => {
+            const link = readLabel(parcel);
+            if (!link) return null;
+            return {
+              tracking_number: parcel.tracking_number,
+              tracking_url: parcel.tracking_url,
+              label_url: link,
+            };
+          })
+          .filter((label): label is NonNullable<typeof label> => label !== null)
+      : labelLink
         ? [
             {
               tracking_number: firstParcel.tracking_number,
@@ -272,8 +323,9 @@ export class SendCloudFulfillmentProvider extends AbstractFulfillmentProviderSer
               label_url: labelLink,
             },
           ]
-        : [],
-    };
+        : [];
+
+    return { data: baseData, labels };
   }
 
   async createReturnFulfillment(

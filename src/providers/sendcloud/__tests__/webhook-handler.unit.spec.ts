@@ -356,6 +356,147 @@ describe("processSendcloudWebhook", () => {
     });
   });
 
+  describe("multi-collo aggregation", () => {
+    const baseMultiData = {
+      sendcloud_shipment_id: "ship_multi",
+      sendcloud_parcel_id: 700,
+      is_multicollo: true,
+      aggregate_status: "pending" as const,
+      parcels: [
+        {
+          sendcloud_parcel_id: 700,
+          tracking_number: "3S700",
+          tracking_url: "https://tr/700",
+          status: null,
+          label_url: null,
+        },
+        {
+          sendcloud_parcel_id: 701,
+          tracking_number: "3S701",
+          tracking_url: "https://tr/701",
+          status: null,
+          label_url: null,
+        },
+      ],
+    };
+
+    it("partial delivery updates the matching parcel and flags partially_delivered", async () => {
+      const fulfillment = { id: "ful_multi_1", data: { ...baseMultiData } };
+      const container = buildContainer([fulfillment]);
+      const payload = {
+        action: "parcel_status_changed",
+        timestamp: 1800000000001,
+        parcel: {
+          id: 700,
+          tracking_number: "3S700",
+          tracking_url: "https://tr/700",
+          status: { id: 11, message: "Delivered" },
+        },
+      };
+      const { raw, signature } = signBody(payload);
+
+      await processSendcloudWebhook(container, DEFAULT_OPTIONS, {
+        signature,
+        rawBody: raw,
+        payload,
+      });
+
+      const call = updateFulfillmentRun.mock.calls[0]?.[0] as {
+        input: {
+          data: {
+            parcels: Array<{ status: unknown }>;
+            aggregate_status: string;
+          };
+          delivered_at?: Date;
+        };
+      };
+      expect(call.input.data.aggregate_status).toBe("partially_delivered");
+      expect(call.input.data.parcels[0].status).toEqual({
+        id: 11,
+        message: "Delivered",
+      });
+      expect(call.input.data.parcels[1].status).toBeNull();
+      expect(call.input.delivered_at).toBeUndefined();
+    });
+
+    it("marks delivered_at only when every parcel has status.id 11", async () => {
+      const fulfillment = {
+        id: "ful_multi_2",
+        data: {
+          ...baseMultiData,
+          parcels: [
+            {
+              ...baseMultiData.parcels[0],
+              status: { id: 11, message: "Delivered" },
+            },
+            baseMultiData.parcels[1],
+          ],
+        },
+      };
+      const container = buildContainer([fulfillment]);
+      const payload = {
+        action: "parcel_status_changed",
+        timestamp: 1800000000002,
+        parcel: {
+          id: 701,
+          status: { id: 11, message: "Delivered" },
+        },
+      };
+      const { raw, signature } = signBody(payload);
+
+      await processSendcloudWebhook(container, DEFAULT_OPTIONS, {
+        signature,
+        rawBody: raw,
+        payload,
+      });
+
+      const call = updateFulfillmentRun.mock.calls[0]?.[0] as {
+        input: {
+          data: { aggregate_status: string };
+          delivered_at?: Date;
+        };
+      };
+      expect(call.input.data.aggregate_status).toBe("delivered");
+      expect(call.input.delivered_at).toBeInstanceOf(Date);
+    });
+
+    it("flags aggregate_status 'exception' on parcel status.id 80 without setting delivered_at", async () => {
+      const fulfillment = { id: "ful_multi_3", data: { ...baseMultiData } };
+      const container = buildContainer([fulfillment]);
+      const payload = {
+        action: "parcel_status_changed",
+        timestamp: 1800000000003,
+        parcel: {
+          id: 701,
+          status: { id: 80, message: "Exception: customs hold" },
+        },
+      };
+      const { raw, signature } = signBody(payload);
+
+      await processSendcloudWebhook(container, DEFAULT_OPTIONS, {
+        signature,
+        rawBody: raw,
+        payload,
+      });
+
+      const call = updateFulfillmentRun.mock.calls[0]?.[0] as {
+        input: {
+          data: { aggregate_status: string };
+          metadata?: Record<string, unknown>;
+          delivered_at?: Date;
+        };
+      };
+      expect(call.input.data.aggregate_status).toBe("exception");
+      expect(call.input.metadata).toMatchObject({
+        sendcloud_exception: {
+          timestamp: 1800000000003,
+          message: "Exception: customs hold",
+        },
+      });
+      expect(call.input.delivered_at).toBeUndefined();
+    });
+  });
+
   it("ignores unknown actions and returns 200", async () => {
     const container = buildContainer();
     const payload = {

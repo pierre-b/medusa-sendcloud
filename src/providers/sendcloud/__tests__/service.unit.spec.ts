@@ -1086,6 +1086,191 @@ describe("SendCloudFulfillmentProvider", () => {
         type: MedusaError.Types.UNEXPECTED_STATE,
       });
     });
+
+    describe("multi-collo (parcels hint on fulfillment.metadata)", () => {
+      const MULTICOLLO_PATH = "/api/v3/shipping-options";
+      const multicolloHint = [
+        { weight: 1500, length: 30, width: 20, height: 10 },
+        { weight: 900, length: 20, width: 15, height: 8 },
+      ];
+
+      const multicolloFulfillment = {
+        ...fulfillmentFixture,
+        metadata: { sendcloud_parcels: multicolloHint },
+      } as unknown as Parameters<
+        SendCloudFulfillmentProvider["createFulfillment"]
+      >[3];
+
+      const multicolloCapabilityResponse = {
+        data: [
+          {
+            code: sampleOption.code,
+            name: sampleOption.name,
+            carrier: sampleOption.carrier,
+            functionalities: { multicollo: true },
+            requirements: {
+              fields: [],
+              export_documents: false,
+              is_service_point_required: false,
+            },
+            charging_type: "label_creation",
+          },
+        ],
+      };
+
+      const buildMultiParcelResponse = (count: number) => ({
+        data: {
+          id: "XXX-Multi-Shipment-id",
+          parcels: Array.from({ length: count }, (_, i) => ({
+            id: 500000 + i,
+            status: { code: "READY_TO_SEND", message: "Ready to send" },
+            documents: [
+              {
+                type: "label",
+                size: "a6",
+                link: `https://panel.sendcloud.sc/api/v3/parcels/${500000 + i}/documents/label`,
+              },
+            ],
+            tracking_number: `3SMULTI${i}`,
+            tracking_url: `https://tracking.eu-central-1-0.sendcloud.sc/forward?carrier=postnl&p=${i}`,
+            announced_at: "2024-06-06T17:11:14.712398Z",
+          })),
+          label_details: { mime_type: "application/pdf", dpi: 72 },
+          applied_shipping_rules: [],
+        },
+      });
+
+      it("announces N parcels with the exact hint dims when hint has >1 entries", async () => {
+        nock(BASE)
+          .post(
+            MULTICOLLO_PATH,
+            (body) =>
+              (body as { functionalities?: { multicollo?: boolean } })
+                .functionalities?.multicollo === true
+          )
+          .reply(200, multicolloCapabilityResponse);
+
+        let capturedBody: Record<string, unknown> | undefined;
+        nock(BASE)
+          .post(SHIPMENTS_PATH, (body) => {
+            capturedBody = body as Record<string, unknown>;
+            return true;
+          })
+          .reply(201, buildMultiParcelResponse(2));
+
+        await buildProvider().createFulfillment(
+          fulfillmentData,
+          fulfillmentItems,
+          orderFixture,
+          multicolloFulfillment
+        );
+
+        const parcels = (
+          capturedBody as { parcels: Array<Record<string, unknown>> }
+        ).parcels;
+        expect(parcels).toHaveLength(2);
+        expect(parcels[0]).toMatchObject({
+          weight: { value: "1.500", unit: "kg" },
+          dimensions: {
+            length: "30",
+            width: "20",
+            height: "10",
+            unit: "cm",
+          },
+        });
+        expect(parcels[0].parcel_items).toBeDefined();
+        expect(parcels[1]).toMatchObject({
+          weight: { value: "0.900", unit: "kg" },
+          dimensions: {
+            length: "20",
+            width: "15",
+            height: "8",
+            unit: "cm",
+          },
+        });
+        expect(parcels[1].parcel_items).toBeUndefined();
+      });
+
+      it("single-entry hint takes the single-parcel path (no capability check)", async () => {
+        let capturedBody: Record<string, unknown> | undefined;
+        nock(BASE)
+          .post(SHIPMENTS_PATH, (body) => {
+            capturedBody = body as Record<string, unknown>;
+            return true;
+          })
+          .reply(201, shipmentResponse);
+
+        const result = await buildProvider().createFulfillment(
+          fulfillmentData,
+          fulfillmentItems,
+          orderFixture,
+          {
+            ...fulfillmentFixture,
+            metadata: {
+              sendcloud_parcels: [multicolloHint[0]],
+            },
+          } as unknown as Parameters<
+            SendCloudFulfillmentProvider["createFulfillment"]
+          >[3]
+        );
+
+        const parcels = (
+          capturedBody as { parcels: Array<Record<string, unknown>> }
+        ).parcels;
+        expect(parcels).toHaveLength(1);
+        expect(result.data).not.toHaveProperty("is_multicollo");
+        expect(result.data).not.toHaveProperty("parcels");
+      });
+
+      it("rejects the hint when carrier does not support multi-collo", async () => {
+        nock(BASE).post(MULTICOLLO_PATH).reply(200, { data: [] });
+
+        await expect(
+          buildProvider().createFulfillment(
+            fulfillmentData,
+            fulfillmentItems,
+            orderFixture,
+            multicolloFulfillment
+          )
+        ).rejects.toMatchObject({
+          type: MedusaError.Types.NOT_ALLOWED,
+        });
+      });
+
+      it("returns is_multicollo data with parcels[], aggregate_status 'pending', and N labels", async () => {
+        nock(BASE)
+          .post(MULTICOLLO_PATH)
+          .reply(200, multicolloCapabilityResponse);
+        nock(BASE).post(SHIPMENTS_PATH).reply(201, buildMultiParcelResponse(3));
+
+        const hint3 = [
+          ...multicolloHint,
+          { weight: 400, length: 15, width: 10, height: 5 },
+        ];
+
+        const result = await buildProvider().createFulfillment(
+          fulfillmentData,
+          fulfillmentItems,
+          orderFixture,
+          {
+            ...fulfillmentFixture,
+            metadata: { sendcloud_parcels: hint3 },
+          } as unknown as Parameters<
+            SendCloudFulfillmentProvider["createFulfillment"]
+          >[3]
+        );
+
+        expect(result.data).toMatchObject({
+          sendcloud_shipment_id: "XXX-Multi-Shipment-id",
+          sendcloud_parcel_id: 500000,
+          is_multicollo: true,
+          aggregate_status: "pending",
+        });
+        const parcels = (result.data as { parcels: unknown[] }).parcels;
+        expect(parcels).toHaveLength(3);
+        expect(result.labels).toHaveLength(3);
+      });
+    });
   });
 
   describe("cancelFulfillment", () => {
@@ -1424,6 +1609,6 @@ describe("SendCloudFulfillmentProvider", () => {
   });
 
   describe("next cycle", () => {
-    it.todo("multi-collo parcel splitting — §8");
+    it.todo("return cancellation — §7 (PATCH /api/v3/returns/:id/cancel)");
   });
 });

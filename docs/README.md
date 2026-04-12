@@ -17,6 +17,7 @@ Each feature landed in this plugin gets its own page here. The index is the auth
 - [Bulk label download — `POST /admin/sendcloud/labels/bulk` (§6.3)](./bulk-labels.md) — admin downloads one merged PDF covering up to 20 fulfillments at once
 - [Per-fulfillment label — `GET /admin/sendcloud/labels/{fulfillment_id}` (§6.2)](./single-label-download.md) — admin downloads a single PDF via GET with optional paper_size + dpi
 - [Admin SendCloud dashboard — `/app/settings/sendcloud` (§15.1)](./admin-settings.md) — connection status, webhook URL, and enabled-carrier list nested under admin Settings
+- [Multi-collo shipments (§8)](./multi-collo.md) — admin-specified per-parcel split via `fulfillment.metadata.sendcloud_parcels`, with carrier pre-validation and webhook-driven status aggregation
 
 ## OpenAPI snapshots
 
@@ -41,7 +42,8 @@ Vendor-authoritative copies of the SendCloud v3 specs the plugin relies on. Kept
 - [`plans/09-bulk-label-download.md`](./plans/09-bulk-label-download.md) — cycle 09: bulk label download
 - [`plans/10-single-label-download.md`](./plans/10-single-label-download.md) — cycle 10: per-fulfillment label shortcut
 - [`plans/11-admin-settings-widget.md`](./plans/11-admin-settings-widget.md) — cycle 11: admin SendCloud dashboard page
+- [`plans/12-multi-collo.md`](./plans/12-multi-collo.md) — cycle 12: multi-collo shipments + webhook aggregation
 
 ## Roadmap
 
-See `../../chocolaterie/docs/medusa-sendcloud-plugin-spec.md` §19 for the full feature checklist (P0 → P3). P0 complete; P1 progressing (service points ✅, bulk labels ✅, single label ✅, admin settings widget ✅). Next: multi-collo (§8), return cancellation, or ZPL/PNG format variants.
+See `../../chocolaterie/docs/medusa-sendcloud-plugin-spec.md` §19 for the full feature checklist (P0 → P3). P0 complete; P1 progressing (service points ✅, bulk labels ✅, single label ✅, admin settings widget ✅, multi-collo ✅). Next: return cancellation (§7 PATCH), fulfillment creation widget (§15.3), or ZPL/PNG format variants.

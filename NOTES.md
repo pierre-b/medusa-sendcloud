@@ -50,6 +50,38 @@ SendCloud quotes in EUR by default (and the shipping-options snapshot only lists
 
 ---
 
+## Added in cycle 12 (multi-collo shipments, 2026-04-12)
+
+### Admin trigger is `fulfillment.metadata.sendcloud_parcels`
+
+`POST /admin/orders/:id/fulfillments` body has `metadata` natively. Medusa core attaches it to the fulfillment record; the provider reads `fulfillment.metadata.sendcloud_parcels` from `createFulfillment`'s 4th arg. No new admin route, no workflow hook. Verified via MedusaDocs MCP — `POST /admin/orders/:id/fulfillments` does NOT accept a `data` pass-through (data is copied from shipping_option.data); `POST /admin/fulfillments` does but bypasses the core workflow.
+
+### Parcel items live on parcels[0] only
+
+Spec §8 doesn't say whether line items should be distributed across parcels. MVP keeps all `parcel_items` on the primary parcel; the rest carry only weight + dimensions. Per-parcel item distribution is a §9 follow-up if customers need per-parcel customs declarations.
+
+### Multi-collo capability check every call
+
+`assertCarrierSupportsMulticollo` hits `/api/v3/shipping-options` on every multi-collo fulfillment (~100ms). Not cached this cycle. Add request-scoped or TTL cache if it becomes hot.
+
+### sendcloud_parcel_id stays a scalar pointing at parcels[0]
+
+Cycles 09 (bulk labels) and 10 (single label) keep working unchanged for multi-collo fulfillments — they just download the primary label. Secondary parcel labels live on `fulfillment.data.parcels[i].label_url`. A follow-up cycle can extend the bulk-label route to auto-explode multi-collo fulfillments into their parcel ids.
+
+### Multi-collo returns deferred
+
+Spec §7 only covers single-parcel returns-announce. Cycle 06 already persists `sendcloud_multi_collo_ids[]` from the response for visibility but doesn't split returns on input.
+
+### Async `/api/v3/shipments` endpoint not wired
+
+Sync `announce-with-shipping-rules` caps at 15 parcels. If a merchant needs >15, async `/api/v3/shipments` (up to 50) requires webhook-driven completion polling — defer until a real request lands.
+
+### Aggregate status uses cycle-07 exception id set
+
+Only status.id 80 drives `aggregate_status === "exception"` right now. If SendCloud adds richer exception ids (1500, 1999 are listed in spec §4 but not in our handler), extend both cycle-07 single-parcel AND the multi-collo `computeAggregateStatus` at the same time so the rules stay symmetric.
+
+---
+
 ## Added in cycle 11 (admin settings dashboard, 2026-04-12)
 
 ### Default sender-address selector deferred

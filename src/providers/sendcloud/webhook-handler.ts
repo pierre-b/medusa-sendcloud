@@ -22,6 +22,29 @@ const STATUS_DELIVERED = 11;
 const STATUS_EXCEPTION = 80;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
+type MulticolloParcel = {
+  sendcloud_parcel_id: number;
+  tracking_number?: string | null;
+  tracking_url?: string | null;
+  status?: { id?: number; message?: string } | null;
+  label_url?: string | null;
+};
+
+type ParcelStatus = { id?: number; message?: string } | null | undefined;
+
+const computeAggregateStatus = (
+  parcels: MulticolloParcel[]
+): "pending" | "partially_delivered" | "delivered" | "exception" => {
+  if (parcels.some((p) => p.status?.id === STATUS_EXCEPTION))
+    return "exception";
+  const delivered = parcels.filter(
+    (p) => p.status?.id === STATUS_DELIVERED
+  ).length;
+  if (delivered === parcels.length) return "delivered";
+  if (delivered > 0) return "partially_delivered";
+  return "pending";
+};
+
 type FulfillmentRecord = {
   id: string;
   data?: Record<string, unknown> | null;
@@ -99,12 +122,13 @@ const findFulfillmentByParcelId = async (
   });
 
   const candidates = data as FulfillmentRecord[];
-  return candidates.find(
-    (fulfillment) =>
-      (fulfillment.data as Record<string, unknown> | undefined)?.[
-        "sendcloud_parcel_id"
-      ] === parcelId
-  );
+  return candidates.find((fulfillment) => {
+    const fulfillmentData = (fulfillment.data ?? {}) as Record<string, unknown>;
+    if (fulfillmentData.sendcloud_parcel_id === parcelId) return true;
+    const parcels = fulfillmentData.parcels as MulticolloParcel[] | undefined;
+    if (!Array.isArray(parcels)) return false;
+    return parcels.some((p) => p?.sendcloud_parcel_id === parcelId);
+  });
 };
 
 const handleParcelStatusChanged = async (
@@ -144,16 +168,19 @@ const handleParcelStatusChanged = async (
     return { status: 200, message: "stale" };
   }
 
-  const nextData: Record<string, unknown> = {
-    status: parcel?.status,
-    status_updated_at: payload.timestamp,
-  };
-  if (parcel?.tracking_number) {
-    nextData.tracking_number = parcel.tracking_number;
-  }
-  if (parcel?.tracking_url) {
-    nextData.tracking_url = parcel.tracking_url;
-  }
+  const isMulticollo = Boolean(existingData.is_multicollo);
+  const parcelStatus: ParcelStatus = parcel?.status ?? null;
+
+  const nextData: Record<string, unknown> = isMulticollo
+    ? buildMulticolloNextData(existingData, parcel, parcelId, payload.timestamp)
+    : {
+        status: parcelStatus,
+        status_updated_at: payload.timestamp,
+        ...(parcel?.tracking_number
+          ? { tracking_number: parcel.tracking_number }
+          : {}),
+        ...(parcel?.tracking_url ? { tracking_url: parcel.tracking_url } : {}),
+      };
 
   const update: {
     id: string;
@@ -165,7 +192,7 @@ const handleParcelStatusChanged = async (
     data: nextData,
   };
 
-  if (parcel?.status?.id === STATUS_EXCEPTION) {
+  if (parcelStatus?.id === STATUS_EXCEPTION) {
     const existingMetadata = (fulfillment.metadata ?? {}) as Record<
       string,
       unknown
@@ -174,12 +201,17 @@ const handleParcelStatusChanged = async (
       ...existingMetadata,
       sendcloud_exception: {
         timestamp: payload.timestamp,
-        message: parcel.status.message,
+        message: parcelStatus.message,
       },
     };
   }
 
-  if (parcel?.status?.id === STATUS_DELIVERED && !fulfillment.delivered_at) {
+  const allDelivered = isMulticollo
+    ? (nextData as { aggregate_status?: string }).aggregate_status ===
+      "delivered"
+    : parcelStatus?.id === STATUS_DELIVERED;
+
+  if (allDelivered && !fulfillment.delivered_at) {
     // Mark the fulfillment itself delivered. Order-level delivered status
     // sync via markOrderFulfillmentAsDeliveredWorkflow needs an orderId
     // we don't have at webhook time (FulfillmentDTO has no order_id, and
@@ -191,6 +223,33 @@ const handleParcelStatusChanged = async (
   await updateFulfillmentWorkflow(container).run({ input: update });
 
   return { status: 200, message: "processed" };
+};
+
+const buildMulticolloNextData = (
+  existingData: Record<string, unknown>,
+  parcel: SendcloudWebhookPayload["parcel"],
+  parcelId: number,
+  timestamp: number
+): Record<string, unknown> => {
+  const existingParcels = (existingData.parcels ?? []) as MulticolloParcel[];
+  const updatedParcels = existingParcels.map((entry) => {
+    if (entry.sendcloud_parcel_id !== parcelId) return entry;
+    return {
+      ...entry,
+      status: parcel?.status ?? entry.status ?? null,
+      ...(parcel?.tracking_number
+        ? { tracking_number: parcel.tracking_number }
+        : {}),
+      ...(parcel?.tracking_url ? { tracking_url: parcel.tracking_url } : {}),
+    };
+  });
+
+  return {
+    ...existingData,
+    parcels: updatedParcels,
+    aggregate_status: computeAggregateStatus(updatedParcels),
+    status_updated_at: timestamp,
+  };
 };
 
 const handleRefundRequested = async (

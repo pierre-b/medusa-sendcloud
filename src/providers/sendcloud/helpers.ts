@@ -461,6 +461,73 @@ export const buildShipmentParcel = (
   return parcel;
 };
 
+export type ParcelHint = {
+  weight: number;
+  length: number;
+  width: number;
+  height: number;
+};
+
+const MAX_HINT_PARCELS = 15;
+
+const assertPositiveNumber = (
+  value: unknown,
+  field: keyof ParcelHint
+): void => {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    throw new MedusaError(
+      MedusaError.Types.INVALID_DATA,
+      `medusa-sendcloud: sendcloud_parcels[].${field} must be a positive number`
+    );
+  }
+};
+
+export const parseParcelsHint = (raw: unknown): ParcelHint[] | null => {
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+  if (raw.length > MAX_HINT_PARCELS) {
+    throw new MedusaError(
+      MedusaError.Types.INVALID_DATA,
+      `medusa-sendcloud: sendcloud_parcels supports at most ${MAX_HINT_PARCELS} entries`
+    );
+  }
+  return raw.map((entry) => {
+    const candidate = entry as Record<string, unknown>;
+    assertPositiveNumber(candidate.weight, "weight");
+    assertPositiveNumber(candidate.length, "length");
+    assertPositiveNumber(candidate.width, "width");
+    assertPositiveNumber(candidate.height, "height");
+    return {
+      weight: candidate.weight as number,
+      length: candidate.length as number,
+      width: candidate.width as number,
+      height: candidate.height as number,
+    };
+  });
+};
+
+export const applyHintDimensions = (
+  parcel: SendCloudParcelRequest,
+  hint: ParcelHint,
+  weightUnit: SendCloudWeightUnitOption
+): SendCloudParcelRequest => {
+  const weightKg = convertToKg(hint.weight, weightUnit);
+  return {
+    ...parcel,
+    weight: { value: weightKg.toFixed(3), unit: "kg" },
+    dimensions: {
+      length: String(hint.length),
+      width: String(hint.width),
+      height: String(hint.height),
+      unit: "cm",
+    },
+  };
+};
+
+export const buildParcelFromHint = (
+  hint: ParcelHint,
+  weightUnit: SendCloudWeightUnitOption
+): SendCloudParcelRequest => applyHintDimensions({}, hint, weightUnit);
+
 export const aggregateParcel = (
   items: CalculateShippingOptionPriceDTO["context"]["items"] | undefined,
   weightUnit: SendCloudWeightUnitOption
