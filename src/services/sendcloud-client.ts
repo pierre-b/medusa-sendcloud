@@ -153,11 +153,17 @@ export class SendCloudClient {
     let lastError: unknown;
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
       let response: Response;
+      let rawText: string;
       try {
         response = await fetch(url, { method: init.method, headers, body });
+        if (response.ok) {
+          if (response.status === 204) return undefined as T;
+          return (await response.json()) as T;
+        }
+        rawText = await response.text();
       } catch (networkError) {
         lastError = networkError;
-        this.logger?.debug?.(
+        this.logger?.debug(
           `SendCloud network error on attempt ${attempt + 1}/${
             this.maxRetries + 1
           }: ${(networkError as Error).message}`
@@ -169,12 +175,6 @@ export class SendCloudClient {
         break;
       }
 
-      if (response.ok) {
-        if (response.status === 204) return undefined as T;
-        return (await response.json()) as T;
-      }
-
-      const rawText = await response.text();
       let parsedBody: unknown;
       try {
         parsedBody = rawText ? JSON.parse(rawText) : undefined;
@@ -189,7 +189,7 @@ export class SendCloudClient {
           attempt,
           this.retryBaseDelayMs
         );
-        this.logger?.debug?.(
+        this.logger?.debug(
           `SendCloud ${response.status} on attempt ${attempt + 1}/${
             this.maxRetries + 1
           }; retrying after ${delay}ms`

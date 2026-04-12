@@ -21,7 +21,6 @@ const SHIPPING_OPTIONS_PATH = "/api/v3/shipping-options";
 export class SendCloudFulfillmentProvider extends AbstractFulfillmentProviderService {
   static identifier = "sendcloud";
 
-  protected readonly logger_: Logger;
   protected readonly options_: SendCloudPluginOptions;
   protected readonly client_: SendCloudClient;
 
@@ -44,7 +43,6 @@ export class SendCloudFulfillmentProvider extends AbstractFulfillmentProviderSer
       );
     }
 
-    this.logger_ = logger;
     this.options_ = options;
     this.client_ = new SendCloudClient({
       publicKey: options.publicKey,

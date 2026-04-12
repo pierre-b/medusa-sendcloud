@@ -1,5 +1,7 @@
 import nock from "nock";
 
+import { MedusaError } from "@medusajs/framework/utils";
+
 import { SendCloudClient } from "../sendcloud-client";
 
 const BASE = "https://panel.sendcloud.sc";
@@ -112,7 +114,10 @@ describe("SendCloudClient.request", () => {
       const client = buildClient();
       await expect(
         client.request({ method: "POST", path: PATH })
-      ).rejects.toThrow(/Invalid contract/);
+      ).rejects.toMatchObject({
+        type: MedusaError.Types.INVALID_DATA,
+        message: expect.stringMatching(/Invalid contract/),
+      });
     });
 
     it("throws UNAUTHORIZED on 401", async () => {
@@ -127,7 +132,9 @@ describe("SendCloudClient.request", () => {
       const client = buildClient();
       await expect(
         client.request({ method: "POST", path: PATH })
-      ).rejects.toThrow(/credentials/i);
+      ).rejects.toMatchObject({
+        type: MedusaError.Types.UNAUTHORIZED,
+      });
     });
 
     it("throws FORBIDDEN on 403", async () => {
@@ -138,7 +145,9 @@ describe("SendCloudClient.request", () => {
       const client = buildClient();
       await expect(
         client.request({ method: "POST", path: PATH })
-      ).rejects.toThrow(/No access/);
+      ).rejects.toMatchObject({
+        type: MedusaError.Types.FORBIDDEN,
+      });
     });
 
     it("throws NOT_FOUND on 404", async () => {
@@ -151,18 +160,23 @@ describe("SendCloudClient.request", () => {
       const client = buildClient();
       await expect(
         client.request({ method: "POST", path: PATH })
-      ).rejects.toThrow(/Resource missing/);
+      ).rejects.toMatchObject({
+        type: MedusaError.Types.NOT_FOUND,
+      });
     });
   });
 
   describe("network errors", () => {
-    it("throws UNEXPECTED_STATE when fetch itself fails", async () => {
-      nock(BASE).post(PATH).replyWithError("ECONNRESET");
+    it("retries network errors up to maxRetries then throws UNEXPECTED_STATE", async () => {
+      nock(BASE).post(PATH).times(4).replyWithError("ECONNRESET");
 
       const client = buildClient();
       await expect(
         client.request({ method: "POST", path: PATH })
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({
+        type: MedusaError.Types.UNEXPECTED_STATE,
+      });
+      expect(nock.isDone()).toBe(true);
     });
   });
 });
