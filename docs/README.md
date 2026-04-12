@@ -5,6 +5,8 @@ Each feature landed in this plugin gets its own page here. The index is the auth
 ## Features
 
 - [Fulfillment options — `getFulfillmentOptions` (§3.1)](./fulfillment-options.md) — list SendCloud carrier-service combinations for shipping-option creation
+- [Validate option + can calculate — `validateOption`, `canCalculate` (§3.2, §3.5)](./validate-option.md) — admin-time confirmation that a saved option still resolves on SendCloud
+- [Validate fulfillment data — `validateFulfillmentData` (§3.3)](./validate-fulfillment-data.md) — checkout-time service-point requirement enforcement
 
 ## OpenAPI snapshots
 
@@ -14,8 +16,9 @@ Vendor-authoritative copies of the SendCloud v3 specs the plugin relies on. Kept
 
 ## Planning
 
-- [`plans/01-get-fulfillment-options.md`](./plans/01-get-fulfillment-options.md) — design doc for this cycle
+- [`plans/01-get-fulfillment-options.md`](./plans/01-get-fulfillment-options.md) — cycle 01: `getFulfillmentOptions`
+- [`plans/02-validate-option-and-checkout-data.md`](./plans/02-validate-option-and-checkout-data.md) — cycle 02: `validateOption` + `canCalculate` + `validateFulfillmentData`
 
 ## Roadmap
 
-See `../../chocolaterie/docs/medusa-sendcloud-plugin-spec.md` §19 for the full feature checklist (P0 → P3). Next cycle: §3.2 `validateOption`.
+See `../../chocolaterie/docs/medusa-sendcloud-plugin-spec.md` §19 for the full feature checklist (P0 → P3). Next cycle: §3.4 `calculatePrice`.

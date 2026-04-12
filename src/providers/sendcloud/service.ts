@@ -2,7 +2,12 @@ import {
   AbstractFulfillmentProviderService,
   MedusaError,
 } from "@medusajs/framework/utils";
-import type { FulfillmentOption, Logger } from "@medusajs/framework/types";
+import type {
+  CreateShippingOptionDTO,
+  FulfillmentOption,
+  Logger,
+  ValidateFulfillmentDataContext,
+} from "@medusajs/framework/types";
 
 import { SendCloudClient } from "../../services/sendcloud-client";
 import type { SendCloudPluginOptions } from "../../types/plugin-options";
@@ -66,7 +71,68 @@ export class SendCloudFulfillmentProvider extends AbstractFulfillmentProviderSer
     const options = response.data ?? [];
     return options.map(toFulfillmentOption);
   }
+
+  async validateOption(data: Record<string, unknown>): Promise<boolean> {
+    const code = readSendCloudCode(data);
+    const filter: SendCloudShippingOptionsFilter = {
+      shipping_option_code: code,
+    };
+    const response =
+      await this.client_.request<SendCloudShippingOptionsResponse>({
+        method: "POST",
+        path: SHIPPING_OPTIONS_PATH,
+        body: filter,
+      });
+
+    return (response.data ?? []).some((option) => option.code === code);
+  }
+
+  async canCalculate(_data: CreateShippingOptionDTO): Promise<boolean> {
+    return true;
+  }
+
+  async validateFulfillmentData(
+    optionData: Record<string, unknown>,
+    data: Record<string, unknown>,
+    _context: ValidateFulfillmentDataContext
+  ): Promise<Record<string, unknown>> {
+    const code = readSendCloudCode(optionData);
+    const requiresServicePoint =
+      optionData.sendcloud_requires_service_point === true;
+
+    if (!requiresServicePoint) return data;
+
+    const servicePointId = data.service_point_id;
+    if (
+      servicePointId === undefined ||
+      servicePointId === null ||
+      (typeof servicePointId !== "string" &&
+        typeof servicePointId !== "number") ||
+      (typeof servicePointId === "string" && servicePointId.length === 0)
+    ) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        `medusa-sendcloud: shipping option ${code} requires a service point — pass data.service_point_id at checkout`
+      );
+    }
+
+    return {
+      ...data,
+      sendcloud_service_point_id: String(servicePointId),
+    };
+  }
 }
+
+const readSendCloudCode = (data: Record<string, unknown>): string => {
+  const code = data.sendcloud_code;
+  if (typeof code !== "string" || code.length === 0) {
+    throw new MedusaError(
+      MedusaError.Types.INVALID_DATA,
+      "medusa-sendcloud: option data is missing sendcloud_code"
+    );
+  }
+  return code;
+};
 
 const toFulfillmentOption = (
   option: SendCloudShippingOption

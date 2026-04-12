@@ -1,5 +1,6 @@
 import nock from "nock";
 
+import { MedusaError } from "@medusajs/framework/utils";
 import type { Logger } from "@medusajs/framework/types";
 
 import SendCloudFulfillmentProvider from "../service";
@@ -159,7 +160,172 @@ describe("SendCloudFulfillmentProvider", () => {
     });
   });
 
+  describe("validateOption", () => {
+    const buildProvider = () =>
+      new SendCloudFulfillmentProvider(
+        { logger: noopLogger },
+        { ...validOptions, retryBaseDelayMs: 0 }
+      );
+
+    it("returns true when SendCloud response contains a matching code", async () => {
+      nock(BASE)
+        .post(PATH, { shipping_option_code: sampleOption.code })
+        .reply(200, { data: [sampleOption], message: null });
+
+      const result = await buildProvider().validateOption({
+        sendcloud_code: sampleOption.code,
+      });
+
+      expect(result).toBe(true);
+      expect(nock.isDone()).toBe(true);
+    });
+
+    it("returns false when SendCloud returns empty data", async () => {
+      nock(BASE)
+        .post(PATH, { shipping_option_code: "postnl:unknown" })
+        .reply(200, { data: [], message: "no match" });
+
+      const result = await buildProvider().validateOption({
+        sendcloud_code: "postnl:unknown",
+      });
+
+      expect(result).toBe(false);
+    });
+
+    it("returns false when response has options but none match the requested code", async () => {
+      nock(BASE)
+        .post(PATH, { shipping_option_code: "postnl:wanted" })
+        .reply(200, { data: [sampleOption], message: null });
+
+      const result = await buildProvider().validateOption({
+        sendcloud_code: "postnl:wanted",
+      });
+
+      expect(result).toBe(false);
+    });
+
+    it("throws INVALID_DATA when sendcloud_code is missing", async () => {
+      await expect(buildProvider().validateOption({})).rejects.toMatchObject({
+        type: MedusaError.Types.INVALID_DATA,
+        message: expect.stringMatching(/sendcloud_code/),
+      });
+    });
+
+    it("throws INVALID_DATA when sendcloud_code is an empty string", async () => {
+      await expect(
+        buildProvider().validateOption({ sendcloud_code: "" })
+      ).rejects.toMatchObject({
+        type: MedusaError.Types.INVALID_DATA,
+      });
+    });
+
+    it("propagates UNAUTHORIZED from the client without catching", async () => {
+      nock(BASE)
+        .post(PATH, { shipping_option_code: sampleOption.code })
+        .reply(401, {
+          errors: [
+            { code: "authentication_failed", detail: "Bad credentials" },
+          ],
+        });
+
+      await expect(
+        buildProvider().validateOption({ sendcloud_code: sampleOption.code })
+      ).rejects.toMatchObject({
+        type: MedusaError.Types.UNAUTHORIZED,
+      });
+    });
+  });
+
+  describe("canCalculate", () => {
+    it("always returns true", async () => {
+      const provider = new SendCloudFulfillmentProvider(
+        { logger: noopLogger },
+        validOptions
+      );
+
+      await expect(
+        provider.canCalculate({ id: "so_test" } as unknown as Parameters<
+          typeof provider.canCalculate
+        >[0])
+      ).resolves.toBe(true);
+    });
+  });
+
+  describe("validateFulfillmentData", () => {
+    const buildProvider = () =>
+      new SendCloudFulfillmentProvider(
+        { logger: noopLogger },
+        { ...validOptions, retryBaseDelayMs: 0 }
+      );
+    const emptyContext = {} as unknown as Parameters<
+      SendCloudFulfillmentProvider["validateFulfillmentData"]
+    >[2];
+
+    const optionWithoutServicePoint = {
+      sendcloud_code: sampleOption.code,
+      sendcloud_requires_service_point: false,
+    };
+    const optionWithServicePoint = {
+      sendcloud_code: sampleServicePointOption.code,
+      sendcloud_requires_service_point: true,
+    };
+
+    it("returns the data unchanged when service point is not required", async () => {
+      const data = { custom_field: "preserved" };
+
+      const result = await buildProvider().validateFulfillmentData(
+        optionWithoutServicePoint,
+        data,
+        emptyContext
+      );
+
+      expect(result).toEqual(data);
+    });
+
+    it("returns data enriched with sendcloud_service_point_id when required and present", async () => {
+      const data = { service_point_id: 12345, custom_field: "preserved" };
+
+      const result = await buildProvider().validateFulfillmentData(
+        optionWithServicePoint,
+        data,
+        emptyContext
+      );
+
+      expect(result).toEqual({
+        service_point_id: 12345,
+        custom_field: "preserved",
+        sendcloud_service_point_id: "12345",
+      });
+    });
+
+    it("throws INVALID_DATA when service point is required but service_point_id is missing", async () => {
+      await expect(
+        buildProvider().validateFulfillmentData(
+          optionWithServicePoint,
+          {},
+          emptyContext
+        )
+      ).rejects.toMatchObject({
+        type: MedusaError.Types.INVALID_DATA,
+        message: expect.stringMatching(/service point/i),
+      });
+    });
+
+    it("throws INVALID_DATA when optionData is missing sendcloud_code", async () => {
+      await expect(
+        buildProvider().validateFulfillmentData(
+          {},
+          { service_point_id: "x" },
+          emptyContext
+        )
+      ).rejects.toMatchObject({
+        type: MedusaError.Types.INVALID_DATA,
+        message: expect.stringMatching(/sendcloud_code/),
+      });
+    });
+  });
+
   describe("next cycle", () => {
-    it.todo("validateOption accepts a SendCloud code that exists (§3.2)");
+    it.todo("returns quote price for calculatePrice — §3.4");
   });
 });
