@@ -22,6 +22,18 @@ The plan originally picked `msw/node` on a second-opinion recommendation. In pra
 
 ---
 
+## Added in cycle 02 (validateOption / canCalculate / validateFulfillmentData, 2026-04-12)
+
+### Service-point round-trip to `servicepoints.sendcloud.sc`
+
+`validateFulfillmentData` currently checks the **presence** and **shape** of `data.service_point_id` but does **not** verify the id still resolves on SendCloud's service-points API (`https://servicepoints.sendcloud.sc/api/v2/service-points/{id}`). SendCloud will reject invalid ids at `createFulfillment` time, but earlier surfacing would improve the checkout UX. Deferred to the dedicated service-points cycle per spec §5.
+
+### Weight-range and country-support validation
+
+Spec §3.3 also wants `validateFulfillmentData` to verify the cart total weight is within `weight.min/max` and that the destination country is supported by the chosen option. Both checks need option-data fields we haven't mapped yet (`weight.min/max`, plus a round-trip with `to_country_code` filter), and realistic cart-context fixtures. Deferred.
+
+---
+
 ## Still parked
 
 ### `noopLogger` test helper duplication

@@ -219,6 +219,14 @@ describe("SendCloudFulfillmentProvider", () => {
       });
     });
 
+    it("throws INVALID_DATA when sendcloud_code is whitespace-only", async () => {
+      await expect(
+        buildProvider().validateOption({ sendcloud_code: "   " })
+      ).rejects.toMatchObject({
+        type: MedusaError.Types.INVALID_DATA,
+      });
+    });
+
     it("propagates UNAUTHORIZED from the client without catching", async () => {
       nock(BASE)
         .post(PATH, { shipping_option_code: sampleOption.code })
@@ -303,6 +311,27 @@ describe("SendCloudFulfillmentProvider", () => {
         buildProvider().validateFulfillmentData(
           optionWithServicePoint,
           {},
+          emptyContext
+        )
+      ).rejects.toMatchObject({
+        type: MedusaError.Types.INVALID_DATA,
+        message: expect.stringMatching(/service point/i),
+      });
+    });
+
+    it.each([
+      { case: "zero", id: 0 },
+      { case: "negative", id: -1 },
+      { case: "NaN", id: Number.NaN },
+      { case: "Infinity", id: Number.POSITIVE_INFINITY },
+      { case: "whitespace-only string", id: "   " },
+      { case: "boolean", id: true },
+      { case: "array", id: [12345] },
+    ])("throws INVALID_DATA when service_point_id is $case", async ({ id }) => {
+      await expect(
+        buildProvider().validateFulfillmentData(
+          optionWithServicePoint,
+          { service_point_id: id },
           emptyContext
         )
       ).rejects.toMatchObject({

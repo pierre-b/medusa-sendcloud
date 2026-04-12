@@ -103,13 +103,7 @@ export class SendCloudFulfillmentProvider extends AbstractFulfillmentProviderSer
     if (!requiresServicePoint) return data;
 
     const servicePointId = data.service_point_id;
-    if (
-      servicePointId === undefined ||
-      servicePointId === null ||
-      (typeof servicePointId !== "string" &&
-        typeof servicePointId !== "number") ||
-      (typeof servicePointId === "string" && servicePointId.length === 0)
-    ) {
+    if (!isValidServicePointId(servicePointId)) {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
         `medusa-sendcloud: shipping option ${code} requires a service point — pass data.service_point_id at checkout`
@@ -125,13 +119,23 @@ export class SendCloudFulfillmentProvider extends AbstractFulfillmentProviderSer
 
 const readSendCloudCode = (data: Record<string, unknown>): string => {
   const code = data.sendcloud_code;
-  if (typeof code !== "string" || code.length === 0) {
+  if (typeof code !== "string" || code.trim().length === 0) {
     throw new MedusaError(
       MedusaError.Types.INVALID_DATA,
       "medusa-sendcloud: option data is missing sendcloud_code"
     );
   }
   return code;
+};
+
+const isValidServicePointId = (value: unknown): value is string | number => {
+  if (typeof value === "string") {
+    return value.trim().length > 0;
+  }
+  if (typeof value === "number") {
+    return Number.isFinite(value) && value > 0;
+  }
+  return false;
 };
 
 const toFulfillmentOption = (
