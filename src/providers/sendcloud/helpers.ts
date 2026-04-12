@@ -161,9 +161,11 @@ export const readSendcloudVariantsFromOrder = (
   order: Partial<FulfillmentOrderDTO> | undefined
 ): SendCloudVariantsMap => {
   const metadata = order?.metadata;
-  if (!metadata || typeof metadata !== "object") return {};
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return {};
+  }
   const raw = (metadata as Record<string, unknown>).sendcloud_variants;
-  if (!raw || typeof raw !== "object") return {};
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
   return raw as SendCloudVariantsMap;
 };
 

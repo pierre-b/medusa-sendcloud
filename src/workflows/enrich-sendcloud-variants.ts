@@ -23,6 +23,11 @@ const updateOrderMetadataStep = createStep(
       unknown
     >;
 
+    // Wholesale overwrite of `sendcloud_variants` is intentional: the
+    // upstream subscriber always rebuilds the full variant set from
+    // order.items, so merging per-key would only risk leaking stale
+    // entries when variants are removed or customs-cleared. Other
+    // metadata keys are preserved via the spread above.
     await orderService.updateOrders([
       {
         id: input.orderId,

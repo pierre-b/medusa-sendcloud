@@ -46,7 +46,7 @@ export const resolveSendcloudVariants = async (
 
   const variantsMap = buildVariantsMap(variants as VariantSnapshot[]);
   if (Object.keys(variantsMap).length === 0) {
-    logger?.debug?.(
+    logger.debug(
       `medusa-sendcloud: order.placed for ${orderId} resolved no customs-relevant variant fields; skipping metadata update`
     );
     return;

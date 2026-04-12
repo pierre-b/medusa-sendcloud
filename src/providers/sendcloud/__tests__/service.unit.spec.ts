@@ -979,6 +979,49 @@ describe("SendCloudFulfillmentProvider", () => {
       });
     });
 
+    it("ignores malformed sendcloud_variants (array instead of object)", async () => {
+      let capturedBody: Record<string, unknown> | undefined;
+      nock(BASE)
+        .post(SHIPMENTS_PATH, (body) => {
+          capturedBody = body as Record<string, unknown>;
+          return true;
+        })
+        .reply(201, shipmentResponse);
+
+      const orderWithMalformedMetadata = {
+        ...orderFixture,
+        items: [
+          {
+            id: "li_1",
+            title: "Bar of Chocolate",
+            unit_price: 925,
+            quantity: 2,
+            variant_id: "var_cocoa",
+          },
+        ],
+        metadata: {
+          sendcloud_variants: [] as unknown as Record<string, unknown>,
+        },
+      } as unknown as Parameters<
+        SendCloudFulfillmentProvider["createFulfillment"]
+      >[2];
+
+      await buildProvider().createFulfillment(
+        fulfillmentData,
+        fulfillmentItems,
+        orderWithMalformedMetadata,
+        fulfillmentFixture
+      );
+
+      const parcel = (
+        capturedBody as { parcels: Array<Record<string, unknown>> }
+      ).parcels[0];
+      const parcelItems = parcel.parcel_items as Array<Record<string, unknown>>;
+      expect(parcelItems[0]).not.toHaveProperty("hs_code");
+      expect(parcelItems[0]).not.toHaveProperty("origin_country");
+      expect(parcelItems[0]).not.toHaveProperty("weight");
+    });
+
     it("falls back to basic parcel_items when order.metadata is absent", async () => {
       let capturedBody: Record<string, unknown> | undefined;
       nock(BASE)
