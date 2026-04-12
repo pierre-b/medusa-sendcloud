@@ -1167,6 +1167,18 @@ describe("SendCloudFulfillmentProvider", () => {
         }
       );
     });
+
+    it("surfaces NOT_ALLOWED when called with return fulfillment data", async () => {
+      await expect(
+        buildProvider().cancelFulfillment({
+          sendcloud_return_id: 98765,
+          sendcloud_parcel_id: 12345,
+        })
+      ).rejects.toMatchObject({
+        type: MedusaError.Types.NOT_ALLOWED,
+        message: expect.stringMatching(/return fulfillments/i),
+      });
+    });
   });
 
   describe("createReturnFulfillment", () => {

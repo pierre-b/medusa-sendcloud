@@ -358,6 +358,16 @@ export class SendCloudFulfillmentProvider extends AbstractFulfillmentProviderSer
   }
 
   async cancelFulfillment(data: Record<string, unknown>): Promise<any> {
+    if (
+      data.sendcloud_return_id !== undefined &&
+      data.sendcloud_shipment_id === undefined
+    ) {
+      throw new MedusaError(
+        MedusaError.Types.NOT_ALLOWED,
+        "medusa-sendcloud: cancellation of return fulfillments via the provider is not supported yet. Cancel the return manually in the SendCloud dashboard until the return-cancellation cycle lands."
+      );
+    }
+
     const shipmentId = requireString(
       data.sendcloud_shipment_id,
       "data.sendcloud_shipment_id"

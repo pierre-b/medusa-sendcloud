@@ -62,7 +62,11 @@ Response's `multi_collo_ids[]` is persisted on `fulfillment.data.sendcloud_multi
 
 ### Return cancellation
 
-`PATCH /api/v3/returns/{id}/cancel` not implemented. Pairs naturally with the webhook cycle.
+`PATCH /api/v3/returns/{id}/cancel` not implemented. `cancelFulfillment` detects return data (`sendcloud_return_id` present, `sendcloud_shipment_id` absent) and throws `NOT_ALLOWED` with an actionable message. Real cancellation pairs naturally with the webhook cycle.
+
+### `send_tracking_emails` opt-out
+
+`createReturnFulfillment` hardcodes `send_tracking_emails: true` on the return payload. A future `sendTrackingEmails` plugin option can default to `true` and let B2B stores opt out.
 
 ### Return portal + brand / insurance / refund / reason
 
