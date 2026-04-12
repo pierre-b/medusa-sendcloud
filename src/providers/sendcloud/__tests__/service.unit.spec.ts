@@ -925,6 +925,29 @@ describe("SendCloudFulfillmentProvider", () => {
       });
     });
 
+    it("returns labels: [] when the parcel has no label document yet", async () => {
+      const noLabelResponse = {
+        data: {
+          ...shipmentResponse.data,
+          parcels: [{ ...shipmentResponse.data.parcels[0], documents: [] }],
+        },
+      };
+      nock(BASE).post(SHIPMENTS_PATH).reply(201, noLabelResponse);
+
+      const result = await buildProvider().createFulfillment(
+        fulfillmentData,
+        fulfillmentItems,
+        orderFixture,
+        fulfillmentFixture
+      );
+
+      expect(result.labels).toEqual([]);
+      expect(result.data).toMatchObject({
+        sendcloud_shipment_id: "XXX-Shipment-id",
+        label_url: null,
+      });
+    });
+
     it("throws UNEXPECTED_STATE when SendCloud response has no parcels", async () => {
       nock(BASE)
         .post(SHIPMENTS_PATH)

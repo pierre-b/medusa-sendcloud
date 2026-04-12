@@ -254,13 +254,15 @@ export class SendCloudFulfillmentProvider extends AbstractFulfillmentProviderSer
         announced_at: firstParcel.announced_at ?? null,
         applied_shipping_rules: shipment.applied_shipping_rules ?? [],
       },
-      labels: [
-        {
-          tracking_number: firstParcel.tracking_number,
-          tracking_url: firstParcel.tracking_url,
-          label_url: labelLink ?? "",
-        },
-      ],
+      labels: labelLink
+        ? [
+            {
+              tracking_number: firstParcel.tracking_number,
+              tracking_url: firstParcel.tracking_url,
+              label_url: labelLink,
+            },
+          ]
+        : [],
     };
   }
 

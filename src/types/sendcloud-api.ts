@@ -16,7 +16,14 @@ export type SendCloudWeight = {
 
 export type SendCloudPrice = {
   value: string;
-  currency: SendCloudCurrency;
+  /**
+   * ISO 4217 currency code. The OpenAPI snapshot enumerates EUR/GBP/USD
+   * as examples, but SendCloud accepts any standard ISO code for
+   * `parcel_items[].price` and quote values. Kept as `string` so
+   * Medusa stores with other currencies can pass their code through
+   * without casts.
+   */
+  currency: string;
 };
 
 export type SendCloudCarrier = {

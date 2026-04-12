@@ -143,10 +143,10 @@ export const buildParcelItems = (
     const matching = item.line_item_id
       ? lineItemPriceById.get(item.line_item_id)
       : undefined;
-    if (matching && currency) {
+    if (matching && typeof currency === "string" && currency.length > 0) {
       entry.price = {
         value: String(matching.unit_price),
-        currency: currency as "EUR" | "GBP" | "USD",
+        currency: currency.toUpperCase(),
       };
     }
     return entry;
