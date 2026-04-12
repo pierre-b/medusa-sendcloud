@@ -50,6 +50,30 @@ SendCloud quotes in EUR by default (and the shipping-options snapshot only lists
 
 ---
 
+## Added in cycle 09 (bulk label download, 2026-04-12)
+
+### Hard cap of 20 fulfillments per bulk request
+
+SendCloud's `/api/v3/parcel-documents/{type}` caps `parcels[]` at 20 items. We reject >20 with 400 so admins paginate client-side. Server-side batching with ZIP merging is a future cycle — would likely need a pdf-merge library (e.g. `pdf-lib`) or a zip stream.
+
+### Labels only — customs + air waybills deferred
+
+The same upstream endpoint supports `customs-declaration` and `air-waybill` document types. Current route hardcodes `label`. Adding a `document_type` body field is a small follow-up when a customer surfaces the need.
+
+### PDF only — ZPL / PNG deferred
+
+`Accept: application/pdf` hardcoded. ZPL (native thermal-printer format) and PNG are supported by SendCloud but not wired. A plugin option or body param can pick the format later.
+
+### No single-label shortcut route
+
+Admin selecting exactly one fulfillment still goes through the bulk path. A dedicated `GET /admin/sendcloud/labels/{fulfillment_id}` would simplify the client code and let consumers stream without JSON encoding a body. Low priority — bulk works for n=1.
+
+### Array query serialization
+
+`SendCloudClient.buildUrl` uses `URLSearchParams.append` for array values → `?parcels=1&parcels=2&...`. Matches OpenAPI v3 default `style: form, explode: true`. If a SendCloud endpoint ever requires comma-joined arrays (`?parcels=1,2,3`), callers can pre-join into a scalar string.
+
+---
+
 ## Added in cycle 08 (service-point lookup, 2026-04-12)
 
 ### No TTL cache on service-point lookups

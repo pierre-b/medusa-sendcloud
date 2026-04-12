@@ -1424,6 +1424,6 @@ describe("SendCloudFulfillmentProvider", () => {
   });
 
   describe("next cycle", () => {
-    it.todo("bulk label download — §6.3");
+    it.todo("per-fulfillment label download shortcut — §6.2");
   });
 });

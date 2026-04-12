@@ -72,6 +72,73 @@ export const parseServicePointsQuery = (
   return { ok: true, value };
 };
 
+export type BulkLabelInput = {
+  fulfillmentIds: string[];
+  paperSize: "a4" | "a6";
+};
+
+export type ParsedBulkLabelRequest =
+  | { ok: true; value: BulkLabelInput }
+  | { ok: false; error: string };
+
+const MAX_BULK_FULFILLMENTS = 20;
+
+export const parseBulkLabelRequest = (
+  body: unknown
+): ParsedBulkLabelRequest => {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return {
+      ok: false,
+      error: "medusa-sendcloud: request body must be a JSON object",
+    };
+  }
+  const input = body as Record<string, unknown>;
+
+  const rawIds = input.fulfillment_ids;
+  if (!Array.isArray(rawIds)) {
+    return {
+      ok: false,
+      error: "medusa-sendcloud: fulfillment_ids must be an array",
+    };
+  }
+  if (rawIds.length === 0) {
+    return {
+      ok: false,
+      error: "medusa-sendcloud: fulfillment_ids must contain at least one id",
+    };
+  }
+  if (rawIds.length > MAX_BULK_FULFILLMENTS) {
+    return {
+      ok: false,
+      error: `medusa-sendcloud: fulfillment_ids exceeds the maximum of ${MAX_BULK_FULFILLMENTS} per request`,
+    };
+  }
+  const ids: string[] = [];
+  for (const candidate of rawIds) {
+    if (typeof candidate !== "string" || candidate.trim().length === 0) {
+      return {
+        ok: false,
+        error:
+          "medusa-sendcloud: every fulfillment_ids entry must be a non-empty string",
+      };
+    }
+    ids.push(candidate.trim());
+  }
+
+  let paperSize: "a4" | "a6" = "a6";
+  if (input.paper_size !== undefined) {
+    if (input.paper_size !== "a4" && input.paper_size !== "a6") {
+      return {
+        ok: false,
+        error: 'medusa-sendcloud: paper_size must be "a4" or "a6"',
+      };
+    }
+    paperSize = input.paper_size;
+  }
+
+  return { ok: true, value: { fulfillmentIds: ids, paperSize } };
+};
+
 export const verifySendcloudSignature = (
   rawBody: Buffer | string,
   signatureHeader: string,

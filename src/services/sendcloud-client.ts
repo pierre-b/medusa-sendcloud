@@ -19,11 +19,18 @@ export type SendCloudClientOptions = {
   retryBaseDelayMs?: number;
 };
 
+export type SendCloudQueryValue =
+  | string
+  | number
+  | boolean
+  | undefined
+  | Array<string | number | boolean>;
+
 export type SendCloudRequestInit = {
   method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   path: string;
   body?: unknown;
-  query?: Record<string, string | number | boolean | undefined>;
+  query?: Record<string, SendCloudQueryValue>;
   /**
    * Per-request override of the SendCloud base URL. Used when a feature
    * hits a different SendCloud subdomain (e.g. `servicepoints.sendcloud.sc`
@@ -31,6 +38,16 @@ export type SendCloudRequestInit = {
    * baseUrl when not set.
    */
   baseUrl?: string;
+  /**
+   * Override the `Accept` header for this request. Defaults to
+   * `application/json`; `requestBinary` defaults to `application/pdf`.
+   */
+  accept?: string;
+};
+
+export type SendCloudBinaryResponse = {
+  body: Buffer;
+  contentType: string;
 };
 
 const RETRYABLE_STATUS = new Set<number>([429]);
@@ -138,7 +155,13 @@ export class SendCloudClient {
     const url = new URL(path, baseUrlOverride ?? this.baseUrl);
     if (query) {
       for (const [key, value] of Object.entries(query)) {
-        if (value !== undefined) {
+        if (value === undefined) continue;
+        if (Array.isArray(value)) {
+          for (const item of value) {
+            if (item === undefined) continue;
+            url.searchParams.append(key, String(item));
+          }
+        } else {
           url.searchParams.set(key, String(value));
         }
       }
@@ -146,11 +169,14 @@ export class SendCloudClient {
     return url.toString();
   }
 
-  async request<T = unknown>(init: SendCloudRequestInit): Promise<T> {
+  private async executeRaw(
+    init: SendCloudRequestInit,
+    defaultAccept: string
+  ): Promise<Response> {
     const url = this.buildUrl(init.path, init.query, init.baseUrl);
     const headers: Record<string, string> = {
       authorization: this.buildAuthHeader(),
-      accept: "application/json",
+      accept: init.accept ?? defaultAccept,
     };
     let body: string | undefined;
     if (init.body !== undefined) {
@@ -165,8 +191,7 @@ export class SendCloudClient {
       try {
         response = await fetch(url, { method: init.method, headers, body });
         if (response.ok) {
-          if (response.status === 204) return undefined as T;
-          return (await response.json()) as T;
+          return response;
         }
         rawText = await response.text();
       } catch (networkError) {
@@ -220,6 +245,24 @@ export class SendCloudClient {
         ? `SendCloud request failed after ${this.maxRetries + 1} attempts: ${lastError.message}`
         : `SendCloud request failed after ${this.maxRetries + 1} attempts`;
     throw new MedusaError(MedusaError.Types.UNEXPECTED_STATE, message);
+  }
+
+  async request<T = unknown>(init: SendCloudRequestInit): Promise<T> {
+    const response = await this.executeRaw(init, "application/json");
+    if (response.status === 204) return undefined as T;
+    return (await response.json()) as T;
+  }
+
+  async requestBinary(
+    init: SendCloudRequestInit
+  ): Promise<SendCloudBinaryResponse> {
+    const response = await this.executeRaw(init, "application/pdf");
+    const arrayBuffer = await response.arrayBuffer();
+    const contentType =
+      response.headers.get("content-type") ??
+      init.accept ??
+      "application/octet-stream";
+    return { body: Buffer.from(arrayBuffer), contentType };
   }
 }
 
