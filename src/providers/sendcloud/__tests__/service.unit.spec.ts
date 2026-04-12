@@ -538,6 +538,18 @@ describe("SendCloudFulfillmentProvider", () => {
       });
     });
 
+    it("throws INVALID_DATA when defaultFromCountryCode is whitespace-only", async () => {
+      await expect(
+        buildProvider({ defaultFromCountryCode: "   " }).calculatePrice(
+          optionData,
+          methodData,
+          buildContext({})
+        )
+      ).rejects.toMatchObject({
+        type: MedusaError.Types.INVALID_DATA,
+      });
+    });
+
     it("throws INVALID_DATA when cart has no weight and no volume", async () => {
       const emptyItem = buildItem({
         weight: 0,
