@@ -55,7 +55,7 @@ export class SendCloudClient {
 
   async request<T = unknown>(_init: SendCloudRequestInit): Promise<T> {
     throw new MedusaError(
-      MedusaError.Types.NOT_ALLOWED,
+      MedusaError.Types.UNEXPECTED_STATE,
       "SendCloudClient.request is not implemented yet"
     );
   }
