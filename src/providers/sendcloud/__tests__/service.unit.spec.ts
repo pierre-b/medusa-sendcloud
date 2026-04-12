@@ -306,6 +306,19 @@ describe("SendCloudFulfillmentProvider", () => {
       });
     });
 
+    it("accepts alphanumeric carrier service-point ids verbatim", async () => {
+      const result = await buildProvider().validateFulfillmentData(
+        optionWithServicePoint,
+        { service_point_id: "NL-123456" },
+        emptyContext
+      );
+
+      expect(result).toEqual({
+        service_point_id: "NL-123456",
+        sendcloud_service_point_id: "NL-123456",
+      });
+    });
+
     it("throws INVALID_DATA when service point is required but service_point_id is missing", async () => {
       await expect(
         buildProvider().validateFulfillmentData(
