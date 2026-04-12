@@ -77,7 +77,9 @@ export const fetchSendcloudLabel = async (
     };
   }
 
-  const row = rows.find((r) => r.id === input.fulfillmentId);
+  // Query.graph with a scalar `id` filter on a primary-key column returns
+  // at most one row; no need for a redundant find().
+  const row = rows[0];
   if (!row) {
     return {
       status: 404,
