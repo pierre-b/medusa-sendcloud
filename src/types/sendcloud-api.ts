@@ -261,6 +261,30 @@ export type SendCloudShipmentCancelResponse = {
   };
 };
 
+export type SendCloudReturnShippingOption = {
+  code: string;
+};
+
+export type SendCloudReturnRequest = {
+  from_address: SendCloudAddress;
+  to_address: SendCloudAddress;
+  shipping_option?: SendCloudReturnShippingOption;
+  dimensions?: SendCloudDimension;
+  weight?: SendCloudWeight;
+  collo_count?: number;
+  parcel_items?: SendCloudParcelItemRequest[];
+  send_tracking_emails?: boolean;
+  brand_id?: number;
+  order_number?: string;
+  customs_invoice_nr?: string;
+};
+
+export type SendCloudReturnResponse = {
+  return_id: number;
+  parcel_id: number;
+  multi_collo_ids: number[];
+};
+
 export type SendCloudVariantCustomsEntry = {
   hs_code?: string;
   origin_country?: string;

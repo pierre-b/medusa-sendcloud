@@ -50,6 +50,26 @@ SendCloud quotes in EUR by default (and the shipping-options snapshot only lists
 
 ---
 
+## Added in cycle 06 (createReturnFulfillment, 2026-04-12)
+
+### Tracking number / URL for returns arrive via webhook
+
+`POST /api/v3/returns/announce-synchronously` response only gives `{ return_id, parcel_id, multi_collo_ids }` — no tracking info. `fulfillment.data.tracking_number` and `tracking_url` stay `null` until spec §4's `parcel_status_changed` webhook lands. `labels[0]` is emitted with empty-string tracking fields so Medusa's `FulfillmentLabel.tracking_number: string` typing holds; real values populate on the first webhook.
+
+### Multi-collo returns
+
+Response's `multi_collo_ids[]` is persisted on `fulfillment.data.sendcloud_multi_collo_ids` but only the primary `parcel_id` gets a label entry. Multi-collo split / aggregation is still its own cycle (spec §8).
+
+### Return cancellation
+
+`PATCH /api/v3/returns/{id}/cancel` not implemented. Pairs naturally with the webhook cycle.
+
+### Return portal + brand / insurance / refund / reason
+
+Spec §7.1 hosted portal and optional return fields (`total_insured_value`, `return_fee`, `reason`) deferred until a merchant needs them.
+
+---
+
 ## Resolved in cycle 05 (variant customs resolution, 2026-04-12)
 
 ### ✅ Variant resolution for full customs

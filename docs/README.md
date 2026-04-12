@@ -11,6 +11,7 @@ Each feature landed in this plugin gets its own page here. The index is the auth
 - [Create fulfillment — `createFulfillment` (§3.6)](./create-fulfillment.md) — announce the shipment to SendCloud and persist tracking + label URL
 - [Cancel fulfillment — `cancelFulfillment` (§3.7)](./cancel-fulfillment.md) — cancel a SendCloud shipment (manual or compensation)
 - [Variant customs resolution](./variant-customs-resolution.md) — `order.placed` subscriber enriches `order.metadata.sendcloud_variants` so `createFulfillment` can populate `hs_code`, `origin_country`, per-item weight
+- [Create return fulfillment — `createReturnFulfillment` (§3.8)](./create-return-fulfillment.md) — inverted-address return parcel via `/api/v3/returns/announce-synchronously`
 
 ## OpenAPI snapshots
 
@@ -18,6 +19,7 @@ Vendor-authoritative copies of the SendCloud v3 specs the plugin relies on. Kept
 
 - [`openapi-snapshots/shipping-options.yaml`](./openapi-snapshots/shipping-options.yaml) — `POST /api/v3/shipping-options`, used by §3.1 / §3.2 / §3.4
 - [`openapi-snapshots/shipments.yaml`](./openapi-snapshots/shipments.yaml) — `POST /api/v3/shipments/announce-with-shipping-rules` + `/cancel`, used by §3.6 / §3.7
+- [`openapi-snapshots/returns.yaml`](./openapi-snapshots/returns.yaml) — `POST /api/v3/returns/announce-synchronously`, used by §3.8
 
 ## Planning
 
@@ -26,7 +28,8 @@ Vendor-authoritative copies of the SendCloud v3 specs the plugin relies on. Kept
 - [`plans/03-calculate-price.md`](./plans/03-calculate-price.md) — cycle 03: `calculatePrice`
 - [`plans/04-create-and-cancel-fulfillment.md`](./plans/04-create-and-cancel-fulfillment.md) — cycle 04: `createFulfillment` + `cancelFulfillment`
 - [`plans/05-variant-resolution-for-customs.md`](./plans/05-variant-resolution-for-customs.md) — cycle 05: variant customs resolution via subscriber
+- [`plans/06-create-return-fulfillment.md`](./plans/06-create-return-fulfillment.md) — cycle 06: `createReturnFulfillment`
 
 ## Roadmap
 
-See `../../chocolaterie/docs/medusa-sendcloud-plugin-spec.md` §19 for the full feature checklist (P0 → P3). Next cycle: §3.8 `createReturnFulfillment`.
+See `../../chocolaterie/docs/medusa-sendcloud-plugin-spec.md` §19 for the full feature checklist (P0 → P3). Next cycle: §4 `parcel_status_changed` webhook — tracking lifecycle sync from SendCloud back into Medusa.

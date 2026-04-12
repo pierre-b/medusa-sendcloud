@@ -1169,7 +1169,249 @@ describe("SendCloudFulfillmentProvider", () => {
     });
   });
 
+  describe("createReturnFulfillment", () => {
+    const RETURNS_PATH = "/api/v3/returns/announce-synchronously";
+
+    const warehouse = {
+      first_name: "Warehouse",
+      last_name: "Team",
+      company: "Chocolaterie",
+      address_1: "Rue du Cacao 10",
+      city: "Paris",
+      country_code: "FR",
+      postal_code: "75001",
+      phone: "+33100000001",
+    };
+
+    const customer = {
+      first_name: "Jane",
+      last_name: "Doe",
+      address_1: "Stadhuisplein",
+      address_2: "Apartment 17B",
+      city: "Eindhoven",
+      country_code: "NL",
+      postal_code: "1013 AB",
+      phone: "+31988172999",
+    };
+
+    const returnFulfillment = {
+      data: { sendcloud_code: sampleOption.code },
+      location: { address: warehouse },
+      delivery_address: customer,
+      items: [
+        {
+          id: "fitem_r1",
+          title: "Bar of Chocolate",
+          quantity: 1,
+          sku: "BAR-001",
+          barcode: "1234567890",
+          line_item_id: "li_1",
+          inventory_item_id: null,
+        },
+      ],
+      order: {
+        id: "order_1",
+        display_id: 42,
+        currency_code: "EUR",
+        items: [
+          {
+            id: "li_1",
+            title: "Bar of Chocolate",
+            unit_price: 925,
+            quantity: 2,
+            variant_id: "var_cocoa",
+            variant_sku: "BAR-001",
+          },
+        ],
+      },
+    } as unknown as Parameters<
+      SendCloudFulfillmentProvider["createReturnFulfillment"]
+    >[0];
+
+    const returnResponse = {
+      return_id: 98765,
+      parcel_id: 12345,
+      multi_collo_ids: [],
+    };
+
+    const buildProvider = (
+      extra: Partial<
+        ConstructorParameters<typeof SendCloudFulfillmentProvider>[1]
+      > = {}
+    ) =>
+      new SendCloudFulfillmentProvider(
+        { logger: noopLogger },
+        { ...validOptions, retryBaseDelayMs: 0, weightUnit: "g", ...extra }
+      );
+
+    it("POSTs /returns/announce-synchronously with inverted addresses and returns label URL", async () => {
+      let capturedBody: Record<string, unknown> | undefined;
+      nock(BASE)
+        .post(RETURNS_PATH, (body) => {
+          capturedBody = body as Record<string, unknown>;
+          return true;
+        })
+        .reply(201, returnResponse);
+
+      const result =
+        await buildProvider().createReturnFulfillment(returnFulfillment);
+
+      expect(capturedBody).toMatchObject({
+        shipping_option: { code: sampleOption.code },
+        from_address: {
+          name: "Jane Doe",
+          address_line_1: "Stadhuisplein",
+          city: "Eindhoven",
+          country_code: "NL",
+          postal_code: "1013 AB",
+        },
+        to_address: {
+          name: "Warehouse Team",
+          company_name: "Chocolaterie",
+          address_line_1: "Rue du Cacao 10",
+          city: "Paris",
+          country_code: "FR",
+          postal_code: "75001",
+        },
+        order_number: "42",
+        customs_invoice_nr: "42",
+        send_tracking_emails: true,
+      });
+
+      expect(result.data).toMatchObject({
+        sendcloud_return_id: 98765,
+        sendcloud_parcel_id: 12345,
+        sendcloud_multi_collo_ids: [],
+        label_url:
+          "https://panel.sendcloud.sc/api/v3/parcels/12345/documents/label",
+        tracking_number: null,
+        tracking_url: null,
+      });
+      expect(result.labels).toEqual([
+        {
+          tracking_number: "",
+          tracking_url: "",
+          label_url:
+            "https://panel.sendcloud.sc/api/v3/parcels/12345/documents/label",
+        },
+      ]);
+    });
+
+    it("merges variant customs fields into return parcel_items", async () => {
+      let capturedBody: Record<string, unknown> | undefined;
+      nock(BASE)
+        .post(RETURNS_PATH, (body) => {
+          capturedBody = body as Record<string, unknown>;
+          return true;
+        })
+        .reply(201, returnResponse);
+
+      const enriched = {
+        ...returnFulfillment,
+        order: {
+          ...(returnFulfillment as { order: Record<string, unknown> }).order,
+          metadata: {
+            sendcloud_variants: {
+              var_cocoa: {
+                hs_code: "180690",
+                origin_country: "FR",
+                weight: 90,
+              },
+            },
+          },
+        },
+      } as unknown as Parameters<
+        SendCloudFulfillmentProvider["createReturnFulfillment"]
+      >[0];
+
+      await buildProvider().createReturnFulfillment(enriched);
+
+      const parcelItems = (
+        capturedBody as { parcel_items: Array<Record<string, unknown>> }
+      ).parcel_items;
+      expect(parcelItems[0]).toMatchObject({
+        hs_code: "180690",
+        origin_country: "FR",
+        weight: { value: "0.090", unit: "kg" },
+      });
+    });
+
+    it("forwards brandId plugin option as brand_id", async () => {
+      let capturedBody: Record<string, unknown> | undefined;
+      nock(BASE)
+        .post(RETURNS_PATH, (body) => {
+          capturedBody = body as Record<string, unknown>;
+          return true;
+        })
+        .reply(201, returnResponse);
+
+      await buildProvider({ brandId: 7 }).createReturnFulfillment(
+        returnFulfillment
+      );
+
+      expect(capturedBody).toMatchObject({ brand_id: 7 });
+    });
+
+    it("throws INVALID_DATA when sendcloud_code is missing", async () => {
+      const without = {
+        ...returnFulfillment,
+        data: {},
+      } as unknown as Parameters<
+        SendCloudFulfillmentProvider["createReturnFulfillment"]
+      >[0];
+
+      await expect(
+        buildProvider().createReturnFulfillment(without)
+      ).rejects.toMatchObject({
+        type: MedusaError.Types.INVALID_DATA,
+        message: expect.stringMatching(/sendcloud_code/),
+      });
+    });
+
+    it("throws INVALID_DATA when delivery_address is missing", async () => {
+      const without = {
+        ...returnFulfillment,
+        delivery_address: undefined,
+      } as unknown as Parameters<
+        SendCloudFulfillmentProvider["createReturnFulfillment"]
+      >[0];
+
+      await expect(
+        buildProvider().createReturnFulfillment(without)
+      ).rejects.toMatchObject({
+        type: MedusaError.Types.INVALID_DATA,
+      });
+    });
+
+    it("throws INVALID_DATA when location.address is missing", async () => {
+      const without = {
+        ...returnFulfillment,
+        location: {},
+      } as unknown as Parameters<
+        SendCloudFulfillmentProvider["createReturnFulfillment"]
+      >[0];
+
+      await expect(
+        buildProvider().createReturnFulfillment(without)
+      ).rejects.toMatchObject({
+        type: MedusaError.Types.INVALID_DATA,
+      });
+    });
+
+    it("throws UNEXPECTED_STATE when SendCloud response lacks return_id", async () => {
+      nock(BASE)
+        .post(RETURNS_PATH)
+        .reply(201, { parcel_id: 123, multi_collo_ids: [] });
+
+      await expect(
+        buildProvider().createReturnFulfillment(returnFulfillment)
+      ).rejects.toMatchObject({
+        type: MedusaError.Types.UNEXPECTED_STATE,
+      });
+    });
+  });
+
   describe("next cycle", () => {
-    it.todo("createReturnFulfillment — §3.8");
+    it.todo("parcel_status_changed webhook — §4");
   });
 });

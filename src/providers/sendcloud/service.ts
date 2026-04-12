@@ -12,12 +12,15 @@ import type {
   FulfillmentOption,
   FulfillmentOrderDTO,
   Logger,
+  StockLocationDTO,
   ValidateFulfillmentDataContext,
 } from "@medusajs/framework/types";
 
 import { SendCloudClient } from "../../services/sendcloud-client";
 import type { SendCloudPluginOptions } from "../../types/plugin-options";
 import type {
+  SendCloudReturnRequest,
+  SendCloudReturnResponse,
   SendCloudShipmentCancelResponse,
   SendCloudShipmentRequest,
   SendCloudShipmentResponse,
@@ -27,6 +30,7 @@ import type {
 } from "../../types/sendcloud-api";
 import {
   aggregateParcel,
+  buildParcelItems,
   buildShipmentParcel,
   buildToAddress,
   isValidServicePointId,
@@ -42,6 +46,7 @@ type InjectedDependencies = {
 const SHIPPING_OPTIONS_PATH = "/api/v3/shipping-options";
 const SHIPMENTS_WITH_RULES_PATH =
   "/api/v3/shipments/announce-with-shipping-rules";
+const RETURNS_SYNC_PATH = "/api/v3/returns/announce-synchronously";
 const DEFAULT_EXPORT_REASON = "commercial_goods" as const;
 
 export class SendCloudFulfillmentProvider extends AbstractFulfillmentProviderService {
@@ -268,6 +273,87 @@ export class SendCloudFulfillmentProvider extends AbstractFulfillmentProviderSer
             },
           ]
         : [],
+    };
+  }
+
+  async createReturnFulfillment(
+    fulfillment: Record<string, unknown>
+  ): Promise<CreateFulfillmentResult> {
+    const data = (fulfillment.data ?? {}) as Record<string, unknown>;
+    const code = readSendCloudCode(data);
+
+    const fromAddress = buildToAddress(fulfillment.delivery_address);
+    const location = fulfillment.location as
+      | Partial<StockLocationDTO>
+      | undefined;
+    const toAddress = buildToAddress(location?.address);
+
+    const order = fulfillment.order as Partial<FulfillmentOrderDTO> | undefined;
+    const items = fulfillment.items as FulfillmentItemDTO[] | undefined;
+    const parcelItems = buildParcelItems(items, order, {
+      variantsMap: readSendcloudVariantsFromOrder(order),
+      weightUnit: this.options_.weightUnit ?? "g",
+    });
+
+    const orderReference =
+      order?.display_id !== undefined && order?.display_id !== null
+        ? String(order.display_id)
+        : (order?.id ?? undefined);
+
+    const payload: SendCloudReturnRequest = {
+      from_address: fromAddress,
+      to_address: toAddress,
+      shipping_option: { code },
+      send_tracking_emails: true,
+    };
+
+    if (parcelItems.length > 0) payload.parcel_items = parcelItems;
+    if (orderReference) {
+      payload.order_number = orderReference;
+      payload.customs_invoice_nr = orderReference;
+    }
+    if (
+      typeof this.options_.brandId === "number" &&
+      Number.isFinite(this.options_.brandId)
+    ) {
+      payload.brand_id = this.options_.brandId;
+    }
+
+    const response = await this.client_.request<SendCloudReturnResponse>({
+      method: "POST",
+      path: RETURNS_SYNC_PATH,
+      body: payload,
+    });
+
+    if (
+      typeof response?.return_id !== "number" ||
+      typeof response?.parcel_id !== "number"
+    ) {
+      throw new MedusaError(
+        MedusaError.Types.UNEXPECTED_STATE,
+        "medusa-sendcloud: SendCloud returned no parcel for the return"
+      );
+    }
+
+    const labelUrl = `${this.client_.getBaseUrl()}/api/v3/parcels/${response.parcel_id}/documents/label`;
+
+    return {
+      data: {
+        sendcloud_return_id: response.return_id,
+        sendcloud_parcel_id: response.parcel_id,
+        sendcloud_multi_collo_ids: response.multi_collo_ids ?? [],
+        label_url: labelUrl,
+        tracking_number: null,
+        tracking_url: null,
+        status: null,
+      },
+      labels: [
+        {
+          tracking_number: "",
+          tracking_url: "",
+          label_url: labelUrl,
+        },
+      ],
     };
   }
 
