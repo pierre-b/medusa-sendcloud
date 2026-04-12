@@ -1,11 +1,11 @@
-# Admin SendCloud Dashboard — `/app/sendcloud`
+# Admin SendCloud Dashboard — `/app/settings/sendcloud`
 
 Implements spec §15.1. A dedicated admin page that surfaces integration health at a glance: whether the plugin is reaching SendCloud, the webhook URL to paste into SendCloud's own admin, and the list of carrier services currently enabled on the connected account.
 
 ## Flow
 
 ```
-Admin opens /app/sendcloud
+Admin opens /app/settings/sendcloud
   → React route mounts, useQuery kicks off GET /admin/sendcloud/dashboard
   → plugin resolves the fulfillment provider from the container
   → plugin POSTs /api/v3/shipping-options on SendCloud with an empty filter
@@ -43,9 +43,9 @@ type DashboardResponse = {
 
 `POST /api/v3/shipping-options` with `{}` body — same endpoint as `getFulfillmentOptions` (§3.1). See `docs/openapi-snapshots/shipping-options.yaml`.
 
-## Frontend — `/app/sendcloud`
+## Frontend — `/app/settings/sendcloud`
 
-Mounted in the admin sidebar via `defineRouteConfig({ label: "SendCloud", icon: Buildings })`.
+Mounted under Settings via `defineRouteConfig({ label: "SendCloud" })`. File path `src/admin/routes/settings/sendcloud/page.tsx` — Medusa auto-nests any `src/admin/routes/settings/*` route under the Settings page.
 
 ### Sections
 
@@ -60,7 +60,7 @@ Refresh button calls `refetch()` — the `useQuery` retry IS the "test connectio
 - `src/providers/sendcloud/dashboard.ts` — `fetchDashboardSnapshot(container, providerKey)` resolves the provider, calls shipping-options, maps credential errors to a friendly string
 - `src/api/admin/sendcloud/dashboard/route.ts` — thin `GET` wrapper returning the snapshot
 - `src/admin/lib/sdk.ts` — single `Medusa` SDK instance for admin routes (session auth, `VITE_MEDUSA_BACKEND_URL` fallback)
-- `src/admin/routes/sendcloud/page.tsx` — React page using `@medusajs/ui`, `@tanstack/react-query`, `@medusajs/icons`
+- `src/admin/routes/settings/sendcloud/page.tsx` — React page using `@medusajs/ui` and `@tanstack/react-query`
 
 ## Tests
 

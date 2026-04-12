@@ -1,5 +1,4 @@
 import { defineRouteConfig } from "@medusajs/admin-sdk";
-import { Buildings } from "@medusajs/icons";
 import {
   Badge,
   Button,
@@ -10,9 +9,9 @@ import {
   clx,
 } from "@medusajs/ui";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import { sdk } from "../../lib/sdk";
+import { sdk } from "../../../lib/sdk";
 
 type ShippingOption = {
   code: string;
@@ -46,12 +45,21 @@ const SendcloudSettingsPage = () => {
 
   const webhookUrl = useWebhookUrl();
   const [copied, setCopied] = useState(false);
+  const copiedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (copiedTimeoutRef.current) clearTimeout(copiedTimeoutRef.current);
+    },
+    []
+  );
 
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(webhookUrl);
       setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      if (copiedTimeoutRef.current) clearTimeout(copiedTimeoutRef.current);
+      copiedTimeoutRef.current = setTimeout(() => setCopied(false), 1500);
     } catch {
       // clipboard may be unavailable in some admin contexts; silently ignore
     }
@@ -72,8 +80,8 @@ const SendcloudSettingsPage = () => {
       entry.options.push(option);
       byCarrier.set(carrierCode, entry);
     }
-    return Array.from(byCarrier.entries()).sort(([a], [b]) =>
-      a.localeCompare(b)
+    return Array.from(byCarrier.entries()).sort(([, a], [, b]) =>
+      a.name.localeCompare(b.name)
     );
   }, [data?.shipping_options]);
 
@@ -105,7 +113,7 @@ const SendcloudSettingsPage = () => {
           <div className="flex flex-col gap-1">
             <Badge color="red">Unreachable</Badge>
             <Text className="text-ui-fg-subtle" size="small">
-              {(error as Error)?.message ?? "Unable to reach the plugin API"}
+              {error?.message ?? "Unable to reach the plugin API"}
             </Text>
           </div>
         ) : data?.connected ? (
@@ -201,7 +209,6 @@ const SendcloudSettingsPage = () => {
 
 export const config = defineRouteConfig({
   label: "SendCloud",
-  icon: Buildings,
 });
 
 export default SendcloudSettingsPage;

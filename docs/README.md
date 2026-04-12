@@ -16,7 +16,7 @@ Each feature landed in this plugin gets its own page here. The index is the auth
 - [Service-point lookup — `GET /store/sendcloud/service-points` (§5)](./service-points.md) — storefront PUDO pickup-point search proxied to `servicepoints.sendcloud.sc`
 - [Bulk label download — `POST /admin/sendcloud/labels/bulk` (§6.3)](./bulk-labels.md) — admin downloads one merged PDF covering up to 20 fulfillments at once
 - [Per-fulfillment label — `GET /admin/sendcloud/labels/{fulfillment_id}` (§6.2)](./single-label-download.md) — admin downloads a single PDF via GET with optional paper_size + dpi
-- [Admin SendCloud dashboard — `/app/sendcloud` (§15.1)](./admin-settings.md) — connection status, webhook URL, and enabled-carrier list in the admin sidebar
+- [Admin SendCloud dashboard — `/app/settings/sendcloud` (§15.1)](./admin-settings.md) — connection status, webhook URL, and enabled-carrier list nested under admin Settings
 
 ## OpenAPI snapshots
 
