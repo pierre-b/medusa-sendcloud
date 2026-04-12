@@ -2,7 +2,6 @@ import { MedusaError } from "@medusajs/framework/utils";
 import type { MedusaContainer } from "@medusajs/framework/types";
 
 import type { SendCloudClient } from "../../services/sendcloud-client";
-import type { SendCloudPluginOptions } from "../../types/plugin-options";
 import type {
   SendCloudServicePoint,
   SendCloudServicePointsQuery,
@@ -73,6 +72,3 @@ export const fetchSendcloudServicePoints = async (
 // same pattern).
 export const buildProviderRegistrationKey = (identifier: string): string =>
   `fp_${identifier}_${identifier}`;
-
-// Reused by the storefront options parameter; silence unused import lint.
-export type { SendCloudPluginOptions };
