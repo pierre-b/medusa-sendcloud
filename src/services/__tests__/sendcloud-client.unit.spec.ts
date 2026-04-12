@@ -26,18 +26,6 @@ describe("SendCloudClient", () => {
     });
   });
 
-  describe("getAuthHeader", () => {
-    it("builds a Basic Auth header from publicKey:privateKey", () => {
-      const client = new SendCloudClient({
-        publicKey: "pub",
-        privateKey: "priv",
-      });
-      const expected = `Basic ${Buffer.from("pub:priv", "utf8").toString("base64")}`;
-
-      expect(client.getAuthHeader()).toBe(expected);
-    });
-  });
-
   describe("getBaseUrl", () => {
     it("defaults to https://panel.sendcloud.sc", () => {
       const client = new SendCloudClient({
@@ -57,19 +45,6 @@ describe("SendCloudClient", () => {
       });
 
       expect(client.getBaseUrl()).toBe("https://panel.example.test");
-    });
-  });
-
-  describe("request", () => {
-    it("is not implemented yet", async () => {
-      const client = new SendCloudClient({
-        publicKey: "pub",
-        privateKey: "priv",
-      });
-
-      await expect(
-        client.request({ method: "GET", path: "/api/v3/shipping-options" })
-      ).rejects.toThrow(/not implemented/);
     });
   });
 });

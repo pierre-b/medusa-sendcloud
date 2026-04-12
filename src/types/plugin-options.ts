@@ -15,4 +15,7 @@ export type SendCloudPluginOptions = {
   syncTrackingToOrder?: boolean;
   brandId?: number;
   environment?: SendCloudEnvironment;
+  baseUrl?: string;
+  maxRetries?: number;
+  retryBaseDelayMs?: number;
 };
