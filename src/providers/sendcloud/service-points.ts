@@ -67,8 +67,7 @@ export const fetchSendcloudServicePoints = async (
   }
 };
 
-// Exported for the route file and tests — matches the key published by
-// the module provider registration (see cycle 07 webhook route for the
-// same pattern).
-export const buildProviderRegistrationKey = (identifier: string): string =>
-  `fp_${identifier}_${identifier}`;
+// Re-exported for backward compatibility with imports that landed before
+// cycle 10's extraction. New code should import directly from
+// ./registration.
+export { buildProviderRegistrationKey } from "./registration";

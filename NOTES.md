@@ -50,6 +50,22 @@ SendCloud quotes in EUR by default (and the shipping-options snapshot only lists
 
 ---
 
+## Added in cycle 10 (per-fulfillment label shortcut, 2026-04-12)
+
+### ✅ Extracted `buildProviderRegistrationKey` to `registration.ts`
+
+Four callers now import this helper (webhook route, service-points route, bulk-labels route, single-label route). Moved out of `service-points.ts` into a dedicated `src/providers/sendcloud/registration.ts`. The old re-export from `service-points.ts` is kept for one cycle as a soft-deprecation shim — drop in a later cleanup pass.
+
+### Single-label route mirrors bulk behaviour
+
+The per-fulfillment route reuses cycle-09's `requestBinary`, `buildProviderRegistrationKey`, and the 502-wrap pattern. Admin gets identical `Content-Disposition` headers; filename prefixes ISO date + parcel id for on-disk sorting.
+
+### DPI support where bulk doesn't have it
+
+SendCloud's single-parcel endpoint accepts `dpi`, the bulk one doesn't. Single-label route exposes the `dpi` query param; bulk route doesn't. Matches the upstream OpenAPI — not a cycle-09 omission, just a SendCloud API asymmetry.
+
+---
+
 ## Added in cycle 09 (bulk label download, 2026-04-12)
 
 ### Hard cap of 20 fulfillments per bulk request

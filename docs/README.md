@@ -15,6 +15,7 @@ Each feature landed in this plugin gets its own page here. The index is the auth
 - [Webhook sync — `parcel_status_changed` + `refund_requested` (§4)](./webhook-sync.md) — HMAC-verified SendCloud → Medusa tracking lifecycle + delivered/exception flags
 - [Service-point lookup — `GET /store/sendcloud/service-points` (§5)](./service-points.md) — storefront PUDO pickup-point search proxied to `servicepoints.sendcloud.sc`
 - [Bulk label download — `POST /admin/sendcloud/labels/bulk` (§6.3)](./bulk-labels.md) — admin downloads one merged PDF covering up to 20 fulfillments at once
+- [Per-fulfillment label — `GET /admin/sendcloud/labels/{fulfillment_id}` (§6.2)](./single-label-download.md) — admin downloads a single PDF via GET with optional paper_size + dpi
 
 ## OpenAPI snapshots
 
@@ -37,7 +38,8 @@ Vendor-authoritative copies of the SendCloud v3 specs the plugin relies on. Kept
 - [`plans/07-webhook-parcel-status-sync.md`](./plans/07-webhook-parcel-status-sync.md) — cycle 07: `parcel_status_changed` + `refund_requested` webhook
 - [`plans/08-service-point-lookup.md`](./plans/08-service-point-lookup.md) — cycle 08: storefront service-point proxy
 - [`plans/09-bulk-label-download.md`](./plans/09-bulk-label-download.md) — cycle 09: bulk label download
+- [`plans/10-single-label-download.md`](./plans/10-single-label-download.md) — cycle 10: per-fulfillment label shortcut
 
 ## Roadmap
 
-See `../../chocolaterie/docs/medusa-sendcloud-plugin-spec.md` §19 for the full feature checklist (P0 → P3). P0 complete; P1 in progress (service points ✅, bulk labels ✅). Next: admin settings widget (§15.1) or per-fulfillment label shortcut (§6.2).
+See `../../chocolaterie/docs/medusa-sendcloud-plugin-spec.md` §19 for the full feature checklist (P0 → P3). P0 complete; P1 progressing (service points ✅, bulk labels ✅, single label ✅). Next: admin settings widget (§15.1), multi-collo (§8), or return cancellation + ZPL/PNG format variants.

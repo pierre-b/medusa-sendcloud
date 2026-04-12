@@ -72,6 +72,49 @@ export const parseServicePointsQuery = (
   return { ok: true, value };
 };
 
+const VALID_DPI_VALUES = new Set([72, 150, 203, 300, 600]);
+
+export type LabelQuery = {
+  paperSize: "a4" | "a6";
+  dpi?: number;
+};
+
+export type ParsedLabelQuery =
+  | { ok: true; value: LabelQuery }
+  | { ok: false; error: string };
+
+export const parseLabelQuery = (
+  raw: Record<string, unknown> | undefined | null
+): ParsedLabelQuery => {
+  const rawInput = raw ?? {};
+
+  let paperSize: "a4" | "a6" = "a6";
+  if (rawInput.paper_size !== undefined) {
+    if (rawInput.paper_size !== "a4" && rawInput.paper_size !== "a6") {
+      return {
+        ok: false,
+        error: 'medusa-sendcloud: paper_size must be "a4" or "a6"',
+      };
+    }
+    paperSize = rawInput.paper_size;
+  }
+
+  const value: LabelQuery = { paperSize };
+
+  if (rawInput.dpi !== undefined && rawInput.dpi !== "") {
+    const parsedDpi = Number(rawInput.dpi);
+    if (!Number.isFinite(parsedDpi) || !VALID_DPI_VALUES.has(parsedDpi)) {
+      return {
+        ok: false,
+        error: "medusa-sendcloud: dpi must be one of 72, 150, 203, 300, or 600",
+      };
+    }
+    value.dpi = parsedDpi;
+  }
+
+  return { ok: true, value };
+};
+
 export type BulkLabelInput = {
   fulfillmentIds: string[];
   paperSize: "a4" | "a6";
