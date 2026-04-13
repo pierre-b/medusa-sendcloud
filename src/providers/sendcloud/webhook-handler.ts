@@ -6,6 +6,11 @@ import type { SendCloudPluginOptions } from "../../types/plugin-options";
 import type { SendcloudWebhookPayload } from "../../types/sendcloud-api";
 
 import { verifySendcloudSignature } from "./helpers";
+import {
+  type MulticolloParcel,
+  computeAggregateStatus,
+  findParcelTimestamp,
+} from "./multicollo";
 
 export type SendcloudWebhookInput = {
   signature: string | undefined;
@@ -21,29 +26,6 @@ export type SendcloudWebhookResult = {
 const STATUS_DELIVERED = 11;
 const STATUS_EXCEPTION = 80;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
-
-type MulticolloParcel = {
-  sendcloud_parcel_id: number;
-  tracking_number?: string | null;
-  tracking_url?: string | null;
-  status?: { id?: number; message?: string } | null;
-  label_url?: string | null;
-};
-
-type ParcelStatus = { id?: number; message?: string } | null | undefined;
-
-const computeAggregateStatus = (
-  parcels: MulticolloParcel[]
-): "pending" | "partially_delivered" | "delivered" | "exception" => {
-  if (parcels.some((p) => p.status?.id === STATUS_EXCEPTION))
-    return "exception";
-  const delivered = parcels.filter(
-    (p) => p.status?.id === STATUS_DELIVERED
-  ).length;
-  if (delivered === parcels.length) return "delivered";
-  if (delivered > 0) return "partially_delivered";
-  return "pending";
-};
 
 type FulfillmentRecord = {
   id: string;
@@ -157,7 +139,15 @@ const handleParcelStatusChanged = async (
   }
 
   const existingData = (fulfillment.data ?? {}) as Record<string, unknown>;
-  const existingTimestamp = Number(existingData.status_updated_at ?? 0);
+  const isMulticollo = Boolean(existingData.is_multicollo);
+  const parcelStatus = parcel?.status ?? null;
+
+  const existingTimestamp = isMulticollo
+    ? findParcelTimestamp(
+        existingData.parcels as MulticolloParcel[] | undefined,
+        parcelId
+      )
+    : Number(existingData.status_updated_at ?? 0);
   if (
     Number.isFinite(payload.timestamp) &&
     payload.timestamp <= existingTimestamp
@@ -167,9 +157,6 @@ const handleParcelStatusChanged = async (
     );
     return { status: 200, message: "stale" };
   }
-
-  const isMulticollo = Boolean(existingData.is_multicollo);
-  const parcelStatus: ParcelStatus = parcel?.status ?? null;
 
   const nextData: Record<string, unknown> = isMulticollo
     ? buildMulticolloNextData(existingData, parcel, parcelId, payload.timestamp)
@@ -232,11 +219,12 @@ const buildMulticolloNextData = (
   timestamp: number
 ): Record<string, unknown> => {
   const existingParcels = (existingData.parcels ?? []) as MulticolloParcel[];
-  const updatedParcels = existingParcels.map((entry) => {
+  const updatedParcels: MulticolloParcel[] = existingParcels.map((entry) => {
     if (entry.sendcloud_parcel_id !== parcelId) return entry;
     return {
       ...entry,
       status: parcel?.status ?? entry.status ?? null,
+      status_updated_at: timestamp,
       ...(parcel?.tracking_number
         ? { tracking_number: parcel.tracking_number }
         : {}),
@@ -244,11 +232,13 @@ const buildMulticolloNextData = (
     };
   });
 
+  // Multi-collo intentionally omits root status_updated_at: stale-checking
+  // happens per-parcel via parcels[i].status_updated_at, so a webhook for
+  // parcel B is not falsely rejected because parcel A was processed later.
   return {
     ...existingData,
     parcels: updatedParcels,
     aggregate_status: computeAggregateStatus(updatedParcels),
-    status_updated_at: timestamp,
   };
 };
 

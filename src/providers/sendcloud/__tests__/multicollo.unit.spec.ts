@@ -47,6 +47,12 @@ describe("parseParcelsHint", () => {
     }
   });
 
+  it("throws INVALID_DATA when an entry is null, a string, or an array", () => {
+    expect(() => parseParcelsHint([null])).toThrow(MedusaError);
+    expect(() => parseParcelsHint(["x"])).toThrow(/must be an object/);
+    expect(() => parseParcelsHint([[1, 2, 3]])).toThrow(/must be an object/);
+  });
+
   it("throws INVALID_DATA for non-positive or non-numeric dimensions", () => {
     expect(() =>
       parseParcelsHint([{ weight: 0, length: 10, width: 10, height: 10 }])

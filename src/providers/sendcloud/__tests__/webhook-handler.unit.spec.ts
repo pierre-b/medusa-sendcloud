@@ -495,6 +495,85 @@ describe("processSendcloudWebhook", () => {
       });
       expect(call.input.delivered_at).toBeUndefined();
     });
+
+    it("uses per-parcel status_updated_at for stale-checking — older event for parcel B not rejected because parcel A processed later", async () => {
+      const fulfillment = {
+        id: "ful_multi_4",
+        data: {
+          ...baseMultiData,
+          parcels: [
+            {
+              ...baseMultiData.parcels[0],
+              status: { id: 11, message: "Delivered" },
+              status_updated_at: 1900000000000,
+            },
+            baseMultiData.parcels[1],
+          ],
+        },
+      };
+      const container = buildContainer([fulfillment]);
+      const payload = {
+        action: "parcel_status_changed",
+        timestamp: 1800000000000, // older than parcel A's stored timestamp
+        parcel: { id: 701, status: { id: 3, message: "En route" } },
+      };
+      const { raw, signature } = signBody(payload);
+
+      const result = await processSendcloudWebhook(container, DEFAULT_OPTIONS, {
+        signature,
+        rawBody: raw,
+        payload,
+      });
+
+      expect(result.message).toBe("processed");
+      const call = updateFulfillmentRun.mock.calls[0]?.[0] as {
+        input: {
+          data: {
+            parcels: Array<{
+              sendcloud_parcel_id: number;
+              status_updated_at?: number;
+            }>;
+          };
+        };
+      };
+      const updatedB = call.input.data.parcels.find(
+        (p) => p.sendcloud_parcel_id === 701
+      );
+      expect(updatedB?.status_updated_at).toBe(1800000000000);
+    });
+
+    it("rejects truly-stale per-parcel webhooks (same parcel, older timestamp)", async () => {
+      const fulfillment = {
+        id: "ful_multi_5",
+        data: {
+          ...baseMultiData,
+          parcels: [
+            {
+              ...baseMultiData.parcels[0],
+              status: { id: 11, message: "Delivered" },
+              status_updated_at: 1900000000000,
+            },
+            baseMultiData.parcels[1],
+          ],
+        },
+      };
+      const container = buildContainer([fulfillment]);
+      const payload = {
+        action: "parcel_status_changed",
+        timestamp: 1800000000000, // older than parcel A's own stored timestamp
+        parcel: { id: 700, status: { id: 3, message: "En route" } },
+      };
+      const { raw, signature } = signBody(payload);
+
+      const result = await processSendcloudWebhook(container, DEFAULT_OPTIONS, {
+        signature,
+        rawBody: raw,
+        payload,
+      });
+
+      expect(result.message).toBe("stale");
+      expect(updateFulfillmentRun).not.toHaveBeenCalled();
+    });
   });
 
   it("ignores unknown actions and returns 200", async () => {

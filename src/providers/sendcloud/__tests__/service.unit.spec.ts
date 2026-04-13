@@ -1191,7 +1191,7 @@ describe("SendCloudFulfillmentProvider", () => {
         expect(parcels[1].parcel_items).toBeUndefined();
       });
 
-      it("single-entry hint takes the single-parcel path (no capability check)", async () => {
+      it("single-entry hint takes the single-parcel path and overrides dims on parcels[0]", async () => {
         let capturedBody: Record<string, unknown> | undefined;
         nock(BASE)
           .post(SHIPMENTS_PATH, (body) => {
@@ -1218,8 +1218,52 @@ describe("SendCloudFulfillmentProvider", () => {
           capturedBody as { parcels: Array<Record<string, unknown>> }
         ).parcels;
         expect(parcels).toHaveLength(1);
+        expect(parcels[0]).toMatchObject({
+          weight: { value: "1.500", unit: "kg" },
+          dimensions: {
+            length: "30",
+            width: "20",
+            height: "10",
+            unit: "cm",
+          },
+        });
+        expect(parcels[0].parcel_items).toBeDefined();
         expect(result.data).not.toHaveProperty("is_multicollo");
         expect(result.data).not.toHaveProperty("parcels");
+      });
+
+      it("applies additional_insured_price to every parcel when defaultInsuranceAmount is configured", async () => {
+        nock(BASE)
+          .post(MULTICOLLO_PATH)
+          .reply(200, multicolloCapabilityResponse);
+
+        let capturedBody: Record<string, unknown> | undefined;
+        nock(BASE)
+          .post(SHIPMENTS_PATH, (body) => {
+            capturedBody = body as Record<string, unknown>;
+            return true;
+          })
+          .reply(201, buildMultiParcelResponse(2));
+
+        await buildProvider({ defaultInsuranceAmount: 50 }).createFulfillment(
+          fulfillmentData,
+          fulfillmentItems,
+          orderFixture,
+          multicolloFulfillment
+        );
+
+        const parcels = (
+          capturedBody as { parcels: Array<Record<string, unknown>> }
+        ).parcels;
+        expect(parcels).toHaveLength(2);
+        expect(parcels[0].additional_insured_price).toEqual({
+          value: "50",
+          currency: "EUR",
+        });
+        expect(parcels[1].additional_insured_price).toEqual({
+          value: "50",
+          currency: "EUR",
+        });
       });
 
       it("rejects the hint when carrier does not support multi-collo", async () => {

@@ -80,6 +80,14 @@ Sync `announce-with-shipping-rules` caps at 15 parcels. If a merchant needs >15,
 
 Only status.id 80 drives `aggregate_status === "exception"` right now. If SendCloud adds richer exception ids (1500, 1999 are listed in spec §4 but not in our handler), extend both cycle-07 single-parcel AND the multi-collo `computeAggregateStatus` at the same time so the rules stay symmetric.
 
+### Insurance is per-parcel, not per-shipment (matches SendCloud API + spec §10.1)
+
+`defaultInsuranceAmount` applies to **every** parcel in a multi-collo shipment (post review fix). Spec §10.1 says "every parcel is insured automatically", and SendCloud's `additional_insured_price` is a per-parcel field. Effective coverage on a 3-parcel shipment with `defaultInsuranceAmount: 100` is €300 total, not €100. Document this clearly to merchants who configure the option — if anyone needs a per-shipment cap, expose a separate `insuranceMode: "per-shipment" | "per-parcel"` option later.
+
+### Lost-update race window when concurrent parcel webhooks land at SendCloud retry boundaries
+
+Per-parcel `status_updated_at` (post review fix) prevents the over-aggressive false-stale rejection that the shared root timestamp caused. But two truly concurrent webhooks for **different** parcels of the same fulfillment can still clobber each other if Node processes them in parallel: each handler reads `fulfillment.data.parcels[]` from a pre-state snapshot, computes its update, and `updateFulfillmentWorkflow` does a full-replace on `data`. Whichever write lands second carries forward the older snapshot for the parcel it didn't touch. SendCloud webhooks for different parcels are usually seconds apart in practice, and SendCloud retries up to 10× with exponential backoff (5min → 1h) — so the lost update tends to be re-applied on the next retry. A truly safe fix needs DB-level locking (SELECT FOR UPDATE inside a transaction), optimistic concurrency on a version token, or a per-fulfillment serialisation queue — none of which Medusa exposes natively. Park as a known limitation; revisit if a merchant reports stuck parcel statuses.
+
 ---
 
 ## Added in cycle 11 (admin settings dashboard, 2026-04-12)

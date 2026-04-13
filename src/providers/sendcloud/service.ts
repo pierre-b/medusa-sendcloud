@@ -41,7 +41,10 @@ import {
   readSendcloudVariantsFromOrder,
   requireString,
 } from "./helpers";
-import { assertCarrierSupportsMulticollo } from "./multicollo";
+import {
+  type MulticolloParcel,
+  assertCarrierSupportsMulticollo,
+} from "./multicollo";
 
 type InjectedDependencies = {
   logger: Logger;
@@ -225,7 +228,13 @@ export class SendCloudFulfillmentProvider extends AbstractFulfillmentProviderSer
           applyHintDimensions(primaryParcel, parcelsHint[0], weightUnit),
           ...parcelsHint
             .slice(1)
-            .map((hint) => buildParcelFromHint(hint, weightUnit)),
+            .map((hint) =>
+              buildParcelFromHint(
+                hint,
+                weightUnit,
+                this.options_.defaultInsuranceAmount
+              )
+            ),
         ]
       : [primaryParcel];
 
@@ -292,14 +301,18 @@ export class SendCloudFulfillmentProvider extends AbstractFulfillmentProviderSer
     };
 
     if (isMulticollo) {
+      const persistedParcels: MulticolloParcel[] = responseParcels.map(
+        (parcel) => ({
+          sendcloud_parcel_id: parcel.id,
+          tracking_number: parcel.tracking_number,
+          tracking_url: parcel.tracking_url,
+          status: parcel.status ?? null,
+          label_url: readLabel(parcel),
+          status_updated_at: null,
+        })
+      );
       baseData.is_multicollo = true;
-      baseData.parcels = responseParcels.map((parcel) => ({
-        sendcloud_parcel_id: parcel.id,
-        tracking_number: parcel.tracking_number,
-        tracking_url: parcel.tracking_url,
-        status: parcel.status ?? null,
-        label_url: readLabel(parcel),
-      }));
+      baseData.parcels = persistedParcels;
       baseData.aggregate_status = "pending";
     }
 

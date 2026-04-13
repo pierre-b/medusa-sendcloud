@@ -88,6 +88,11 @@ fulfillment.data = {
    - `partially_delivered` — at least one parcel is delivered, not all
    - `pending` — otherwise
 4. `delivered_at` is set **only** when `aggregate_status === "delivered"`. Single-parcel fulfillments keep the cycle-07 single-status-id-11 rule.
+5. **Per-parcel staleness:** stale-checking compares `payload.timestamp` against `parcels[i].status_updated_at` (the matched parcel's own stored timestamp), not a shared root field. A late-arriving webhook for parcel B is **not** falsely rejected because parcel A was processed at a higher timestamp.
+
+## Insurance
+
+`defaultInsuranceAmount` applies **per parcel**, matching SendCloud's `additional_insured_price` field. A 3-parcel shipment with `defaultInsuranceAmount: 100` results in €300 total coverage, not €100 — per spec §10.1 ("every parcel is insured automatically").
 
 `refund_requested` uses the same multi-parcel lookup; behaviour is unchanged (metadata stamp only).
 

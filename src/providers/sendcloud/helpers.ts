@@ -490,7 +490,13 @@ export const parseParcelsHint = (raw: unknown): ParcelHint[] | null => {
       `medusa-sendcloud: sendcloud_parcels supports at most ${MAX_HINT_PARCELS} entries`
     );
   }
-  return raw.map((entry) => {
+  return raw.map((entry, index) => {
+    if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        `medusa-sendcloud: sendcloud_parcels[${index}] must be an object with weight/length/width/height`
+      );
+    }
     const candidate = entry as Record<string, unknown>;
     assertPositiveNumber(candidate.weight, "weight");
     assertPositiveNumber(candidate.length, "length");
@@ -525,8 +531,22 @@ export const applyHintDimensions = (
 
 export const buildParcelFromHint = (
   hint: ParcelHint,
-  weightUnit: SendCloudWeightUnitOption
-): SendCloudParcelRequest => applyHintDimensions({}, hint, weightUnit);
+  weightUnit: SendCloudWeightUnitOption,
+  insuranceAmount?: number
+): SendCloudParcelRequest => {
+  const parcel = applyHintDimensions({}, hint, weightUnit);
+  if (
+    typeof insuranceAmount === "number" &&
+    Number.isFinite(insuranceAmount) &&
+    insuranceAmount > 0
+  ) {
+    parcel.additional_insured_price = {
+      value: String(insuranceAmount),
+      currency: "EUR",
+    };
+  }
+  return parcel;
+};
 
 export const aggregateParcel = (
   items: CalculateShippingOptionPriceDTO["context"]["items"] | undefined,
