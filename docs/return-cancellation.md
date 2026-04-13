@@ -39,9 +39,10 @@ The result is merged into `fulfillment.data` by Medusa core, so admins see the c
 ```ts
 {
   sendcloud_return_cancellation: {
+    return_id: number; // echo of the SendCloud return id we cancelled
     message: string; // SendCloud's PATCH 202 message
     parent_status: string | null; // from the follow-up GET; null if GET failed
-    requested_at: string; // ISO timestamp the plugin issued the request
+    requested_at: string; // ISO wall-clock timestamp on the plugin host (not SendCloud's processing time)
   }
 }
 ```

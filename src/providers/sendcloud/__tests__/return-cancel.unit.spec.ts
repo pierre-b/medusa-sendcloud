@@ -45,6 +45,7 @@ describe("cancelReturn", () => {
     expect(capturedMethod).toBe("PATCH");
     expect(result).toEqual({
       sendcloud_return_cancellation: {
+        return_id: 98765,
         message: "Cancellation requested successfully",
         parent_status: "cancelling-upstream",
         requested_at: expect.any(String),
@@ -82,6 +83,25 @@ describe("cancelReturn", () => {
     });
   });
 
+  it("surfaces non-default 409 reasons verbatim (carrier-specific rejection)", async () => {
+    nock(DEFAULT_SENDCLOUD_BASE_URL)
+      .patch("/api/v3/returns/66666/cancel")
+      .reply(409, {
+        errors: [
+          {
+            field: "returns",
+            code: 409,
+            message: "Return already shipped to customer",
+          },
+        ],
+      });
+
+    await expect(cancelReturn(buildClient(), 66666)).rejects.toMatchObject({
+      type: MedusaError.Types.NOT_ALLOWED,
+      message: expect.stringMatching(/Return already shipped to customer/),
+    });
+  });
+
   it("returns parent_status: null when the follow-up GET fails", async () => {
     nock(DEFAULT_SENDCLOUD_BASE_URL)
       .patch("/api/v3/returns/77777/cancel")
@@ -116,8 +136,9 @@ describe("cancelReturn", () => {
     await expect(cancelReturn(buildClient(), -5)).rejects.toMatchObject({
       type: MedusaError.Types.INVALID_DATA,
     });
-
-    expect(nock.isDone()).toBe(true); // no interceptor was set up; if any HTTP call happened, nock would surface it
+    // No nock interceptor was registered, and setup-nock.ts calls
+    // disableNetConnect() — any rogue HTTP call would have thrown a
+    // NetConnectNotAllowedError before the INVALID_DATA assertion fires.
   });
 
   it("PATCH targets the exact path with empty body", async () => {

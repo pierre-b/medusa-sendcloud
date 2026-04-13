@@ -8,6 +8,7 @@ import type {
 
 export type ReturnCancellationResult = {
   sendcloud_return_cancellation: {
+    return_id: number;
     message: string;
     parent_status: string | null;
     requested_at: string;
@@ -18,10 +19,21 @@ const isMedusaError = (error: unknown): error is MedusaError =>
   error instanceof MedusaError;
 
 const extractUpstreamMessage = (error: MedusaError): string | null => {
-  // Client error messages embed JSON-stringified upstream payload after the
-  // status prefix; we surface the raw text rather than re-parsing here.
-  const match = error.message.match(/Return is not cancellable\.?/i);
-  return match?.[0] ?? null;
+  // The client embeds the raw upstream body after a "SendCloud (status): "
+  // prefix. Parse the JSON suffix and read errors[0].message so we surface
+  // SendCloud's verbatim 409 reason (carrier-specific rejections vary).
+  const jsonStart = error.message.indexOf("{");
+  if (jsonStart < 0) return null;
+  try {
+    const parsed = JSON.parse(error.message.slice(jsonStart)) as {
+      errors?: Array<{ message?: unknown; detail?: unknown; title?: unknown }>;
+    };
+    const first = parsed.errors?.[0];
+    const candidate = first?.message ?? first?.detail ?? first?.title;
+    return typeof candidate === "string" ? candidate : null;
+  } catch {
+    return null;
+  }
 };
 
 export const cancelReturn = async (
@@ -79,6 +91,7 @@ export const cancelReturn = async (
 
   return {
     sendcloud_return_cancellation: {
+      return_id: returnId,
       message: cancelResponse.message,
       parent_status: parentStatus,
       requested_at: new Date().toISOString(),

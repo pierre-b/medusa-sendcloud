@@ -56,9 +56,9 @@ SendCloud quotes in EUR by default (and the shipping-options snapshot only lists
 
 SendCloud's `PATCH /returns/:id/cancel` returns 202 even when the carrier doesn't support upstream label cancellation — the carrier may still ship the return. Admin needs to confirm via `parent_status` (we surface the immediate value) plus the next webhook update. Documented in `docs/return-cancellation.md`.
 
-### 409 reason extraction is regex-based
+### 409 reason extraction parses the wrapped error message
 
-The plugin's client wraps non-2xx into MedusaError with the raw upstream body as a string suffix; SendCloud's 409 cancel response carries `errors[0].message` (no `detail` / `title`), so `cancelReturn` regex-matches "Return is not cancellable" out of the wrapped message. If SendCloud changes the wording or adds a structured `detail` field upstream, the match becomes "stale wording" and we fall back to a generic message. A cleaner fix would be teaching `extractFirstError` to also read `message`, but that ripples through other 4xx error surfaces — defer until the client gets a broader cleanup.
+The plugin's client wraps non-2xx into MedusaError with the raw upstream body as a string suffix. `cancelReturn.extractUpstreamMessage` slices from the first `{` and JSON.parses the suffix to read `errors[0].message ?? .detail ?? .title` (post review fix). Any 409 reason SendCloud returns surfaces verbatim. The dependency on the client's prefix shape is still fragile — if the client refactors `buildErrorMessage` to a non-JSON format, our parser silently returns null and the fallback "Return is not cancellable" surfaces. Cheap-fix candidate: have the client surface the parsed `errors[0]` on a structured field of MedusaError instead of stuffing it into the message string.
 
 ### `parent_status` follow-up GET is best-effort
 
