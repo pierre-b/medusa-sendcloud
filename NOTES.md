@@ -64,6 +64,8 @@ No new admin route. The widget builds the metadata payload and calls `sdk.admin.
 
 No per-item quantity selector. Admin who needs partial fulfillment falls back to Medusa's standard dialog. Acceptable for MVP — most chocolaterie orders are fulfilled in one shot. Add per-item rows when a merchant asks.
 
+`fulfilled_quantity` lives on the nested `item.detail.fulfilled_quantity` (Medusa v2 `OrderItemDTO`), NOT as a top-level field on the line item. The widget reads from the right path post review fix; if Medusa restructures `OrderItemDTO`, the widget shows all items as unfulfilled regardless of prior fulfillments — risk of duplicate fulfillment attempts. Worth re-verifying on each Medusa upgrade.
+
 ### Total weight hint is "best effort" and weightless-variant prone
 
 Widget computes a "total weight ~X" hint by summing `item.variant.weight × quantity`. If the variant has no weight set, the hint reads as 0 — could mislead admin. Acceptable since the parcel weight is admin-input anyway; the hint is just a starting point.

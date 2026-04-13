@@ -9,6 +9,7 @@ import {
   Label,
   Text,
   clx,
+  toast,
 } from "@medusajs/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
@@ -69,7 +70,11 @@ const SendcloudFulfillmentCreate = ({
             id?: string;
             title?: string;
             quantity?: number;
-            fulfilled_quantity?: number;
+            // Medusa v2 surfaces fulfilled_quantity on the nested OrderItemDTO
+            // (item.detail), not on the line item itself. The flat field
+            // doesn't exist — reading it gives undefined and treats every
+            // item as unfulfilled.
+            detail?: { fulfilled_quantity?: number | string } | null;
             variant?: { weight?: number | null } | null;
           }>
         | undefined) ?? [];
@@ -79,7 +84,7 @@ const SendcloudFulfillmentCreate = ({
         title: item.title ?? "",
         quantity:
           (Number(item.quantity ?? 0) || 0) -
-          (Number(item.fulfilled_quantity ?? 0) || 0),
+          (Number(item.detail?.fulfilled_quantity ?? 0) || 0),
         weight: Number(item.variant?.weight ?? 0) || 0,
       }))
       .filter((item) => item.id && item.quantity > 0);
@@ -108,7 +113,13 @@ const SendcloudFulfillmentCreate = ({
         metadata.sendcloud_parcels = filledRows.map(parseRow);
       }
       if (insurance.trim() !== "") {
-        metadata.sendcloud_insurance_amount = Number(insurance);
+        const parsed = Number(insurance);
+        if (!Number.isFinite(parsed) || parsed < 0) {
+          throw new Error(
+            "Insurance override must be a non-negative number (e.g., 50 for €50 per parcel)."
+          );
+        }
+        metadata.sendcloud_insurance_amount = parsed;
       }
       return sdk.admin.order.createFulfillment(order.id, {
         items: unfulfilled.map((item) => ({
@@ -123,6 +134,7 @@ const SendcloudFulfillmentCreate = ({
       setParcels([emptyRow()]);
       setInsurance("");
       setOpen(false);
+      toast.success("SendCloud fulfillment created");
       queryClient.invalidateQueries({ queryKey: ["orders", order.id] });
     },
     onError: (error: unknown) => {
