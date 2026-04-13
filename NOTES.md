@@ -76,6 +76,10 @@ The order details widget uses `DetailWidgetProps<AdminOrder>` — Medusa's stand
 
 Cycle 11's stance held: no admin test harness, manual verification via `npx medusa plugin:build` + sample app. Settings section + new widget verified in the build output (admin extensions compiled). Same risk surface as before.
 
+### `config_warnings: []` even when the provider can't be resolved
+
+Dashboard's `not registered` branch returns `config_warnings: []` because we have no `provider.options_` to inspect. The settings page can't tell the difference between "no warnings" and "couldn't compute". Mitigated post-review: settings page also handles `isError` separately, but the `not-registered` branch returns 200 with the empty array, not an error. If a merchant's provider truly isn't registered, they'll see "All required plugin options are configured" — misleading. Acceptable because the Connection section right below shows the actual not-registered error message. Revisit if it confuses someone.
+
 ### Stored warnings persist forever
 
 Warnings live on `fulfillment.data` and stay there — even after the merchant fixes the variant data, old fulfillments keep their warnings. This is correct as audit history (the warning describes what shipped, not the variant's current state). If a merchant wants a "clear warnings" admin button, that's a future small cycle.

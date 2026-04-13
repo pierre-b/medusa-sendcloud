@@ -259,7 +259,7 @@ export class SendCloudFulfillmentProvider extends AbstractFulfillmentProviderSer
         variantsMap: readSendcloudVariantsFromOrder(order),
       });
       for (const warning of customsWarnings) {
-        this.logger_?.warn?.(
+        this.logger_?.warn(
           `medusa-sendcloud customs [${warning.code}]: ${warning.message}`
         );
       }

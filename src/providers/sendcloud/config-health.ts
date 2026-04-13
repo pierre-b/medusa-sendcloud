@@ -5,8 +5,11 @@ export type ConfigWarning = {
   message: string;
 };
 
+// ISO 3166-1 alpha-2 codes are uppercase. Lowercase is not valid: the EU
+// country set is uppercase-only, so accepting "fr" would silently make
+// `requiresCustomsCheck` treat domestic FR→FR as cross-border.
 const isTwoLetterIso = (value: unknown): value is string =>
-  typeof value === "string" && /^[A-Za-z]{2}$/.test(value);
+  typeof value === "string" && /^[A-Z]{2}$/.test(value);
 
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.trim().length > 0;

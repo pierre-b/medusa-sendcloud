@@ -117,6 +117,10 @@ const SendcloudSettingsPage = () => {
           <Text className="text-ui-fg-subtle" size="small">
             Loading…
           </Text>
+        ) : isError ? (
+          <Text className="text-ui-fg-subtle" size="small">
+            Configuration status unavailable — see the Connection section below.
+          </Text>
         ) : (data?.config_warnings ?? []).length === 0 ? (
           <Text className="text-ui-fg-subtle" size="small">
             All required plugin options are configured.

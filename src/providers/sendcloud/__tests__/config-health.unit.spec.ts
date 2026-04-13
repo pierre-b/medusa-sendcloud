@@ -35,6 +35,15 @@ describe("getConfigWarnings", () => {
         defaultFromCountryCode: "FRA", // not 2-letter
       })
     ).toContain("missing_from_country");
+
+    expect(
+      codesFor({
+        publicKey: "pub",
+        privateKey: "priv",
+        webhookSecret: "shh",
+        defaultFromCountryCode: "fr", // lowercase — would silently mismatch EU set
+      })
+    ).toContain("missing_from_country");
   });
 
   it("emits missing_webhook_secret when webhookSecret is missing or empty", () => {
