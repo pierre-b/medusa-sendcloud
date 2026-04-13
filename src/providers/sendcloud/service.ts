@@ -46,6 +46,11 @@ import {
   assertCarrierSupportsMulticollo,
 } from "./multicollo";
 import { cancelReturn } from "./return-cancel";
+import {
+  type CustomsWarning,
+  requiresCustomsCheck,
+  validateCustomsData,
+} from "./customs-validation";
 
 type InjectedDependencies = {
   logger: Logger;
@@ -62,12 +67,14 @@ export class SendCloudFulfillmentProvider extends AbstractFulfillmentProviderSer
 
   protected readonly options_: SendCloudPluginOptions;
   protected readonly client_: SendCloudClient;
+  protected readonly logger_: Logger;
 
   constructor(
     { logger }: InjectedDependencies,
     options: SendCloudPluginOptions
   ) {
     super();
+    this.logger_ = logger;
 
     if (!options?.publicKey) {
       throw new MedusaError(
@@ -239,6 +246,25 @@ export class SendCloudFulfillmentProvider extends AbstractFulfillmentProviderSer
         ]
       : [primaryParcel];
 
+    let customsWarnings: CustomsWarning[] = [];
+    if (
+      requiresCustomsCheck(
+        this.options_.defaultFromCountryCode,
+        toAddress.country_code
+      )
+    ) {
+      customsWarnings = validateCustomsData({
+        items: items as FulfillmentItemDTO[] | undefined,
+        order,
+        variantsMap: readSendcloudVariantsFromOrder(order),
+      });
+      for (const warning of customsWarnings) {
+        this.logger_?.warn?.(
+          `medusa-sendcloud customs [${warning.code}]: ${warning.message}`
+        );
+      }
+    }
+
     const orderReference =
       order?.display_id !== undefined && order?.display_id !== null
         ? String(order.display_id)
@@ -315,6 +341,10 @@ export class SendCloudFulfillmentProvider extends AbstractFulfillmentProviderSer
       baseData.is_multicollo = true;
       baseData.parcels = persistedParcels;
       baseData.aggregate_status = "pending";
+    }
+
+    if (customsWarnings.length > 0) {
+      baseData.sendcloud_warnings = customsWarnings;
     }
 
     const labels = isMulticollo

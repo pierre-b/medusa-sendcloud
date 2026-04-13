@@ -50,6 +50,38 @@ SendCloud quotes in EUR by default (and the shipping-options snapshot only lists
 
 ---
 
+## Added in cycle 14 (customs validation + admin surfaces, 2026-04-13)
+
+### `defaultFromCountryCode` is the gate for per-fulfillment customs warnings
+
+If the option is unset, the per-fulfillment validation is skipped entirely. Merchants get a single config warning in the settings page instead of dozens of per-fulfillment warnings. Trade-off: a careless merchant might miss the settings warning if they don't visit `/app/settings/sendcloud`. Acceptable — the settings page is the documented landing zone for SendCloud config, and the badge is orange + visible at the top of the page.
+
+### EU country list is hand-maintained
+
+`EU_COUNTRY_CODES` hardcodes the 27 current member states (2026 list). Source comment in `customs-validation.ts` points at europa.eu. Next likely accessions (Albania, North Macedonia, Montenegro) are not before 2027. When the list updates, `EU_COUNTRY_CODES` + tests + docs all need a touch — keep the change atomic.
+
+### `low_total_value` is currency-agnostic
+
+The rule `totalDeclared < 1` reads raw decimal regardless of currency. Catches the common case (€0.50 of free samples, $0 promo items). For high-denomination currencies (JPY ¥10000 ≈ €60), the rule never triggers — acceptable for now since under-declared values are typically near-zero, not realistic-but-low. If a JPY merchant complains, expose `customsMinValueWarning` plugin option.
+
+### Per-variant deduplication, not per-line
+
+`validateCustomsData` walks distinct variant_ids. A 50-line invoice referencing one broken variant produces 2 warnings, not 100. Trade-off: if line A and line B reference the same variant but only line A has unit_price 0, only line A gets the `zero_value_item` warning (correct — the issue is per-line for prices, per-variant for HS code/origin).
+
+### Admin widget reads from AdminOrder.fulfillments[].data
+
+The order details widget uses `DetailWidgetProps<AdminOrder>` — Medusa's standard order DTO already includes `fulfillments[].data` as `Record<string, unknown>`. No new admin endpoint needed; widget is purely client-side rendering. Hidden when no warnings on any fulfillment of the order.
+
+### Admin UI tests still deferred
+
+Cycle 11's stance held: no admin test harness, manual verification via `npx medusa plugin:build` + sample app. Settings section + new widget verified in the build output (admin extensions compiled). Same risk surface as before.
+
+### Stored warnings persist forever
+
+Warnings live on `fulfillment.data` and stay there — even after the merchant fixes the variant data, old fulfillments keep their warnings. This is correct as audit history (the warning describes what shipped, not the variant's current state). If a merchant wants a "clear warnings" admin button, that's a future small cycle.
+
+---
+
 ## Added in cycle 13 (return cancellation, 2026-04-13)
 
 ### Cancellation is a request, not a guarantee

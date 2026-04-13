@@ -21,10 +21,16 @@ type ShippingOption = {
   requirements?: { is_service_point_required?: boolean };
 };
 
+type ConfigWarning = {
+  code: string;
+  message: string;
+};
+
 type DashboardResponse = {
   connected: boolean;
   error?: string;
   shipping_options: ShippingOption[];
+  config_warnings?: ConfigWarning[];
 };
 
 const WEBHOOK_PATH = "/webhooks/sendcloud";
@@ -104,6 +110,33 @@ const SendcloudSettingsPage = () => {
           {isFetching ? "Refreshing…" : "Refresh"}
         </Button>
       </div>
+
+      <section className="flex flex-col gap-3 px-6 py-4">
+        <Heading level="h2">Configuration & health</Heading>
+        {isLoading ? (
+          <Text className="text-ui-fg-subtle" size="small">
+            Loading…
+          </Text>
+        ) : (data?.config_warnings ?? []).length === 0 ? (
+          <Text className="text-ui-fg-subtle" size="small">
+            All required plugin options are configured.
+          </Text>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {(data?.config_warnings ?? []).map((warning) => (
+              <div
+                key={warning.code}
+                className="flex flex-col gap-1 rounded-md border border-ui-border-strong p-3"
+              >
+                <div className="flex items-center gap-2">
+                  <Badge color="orange">{warning.code}</Badge>
+                </div>
+                <Text size="small">{warning.message}</Text>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       <section className="flex flex-col gap-3 px-6 py-4">
         <Heading level="h2">Connection</Heading>

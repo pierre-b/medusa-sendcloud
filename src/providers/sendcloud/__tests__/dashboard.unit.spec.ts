@@ -30,9 +30,16 @@ describe("fetchDashboardSnapshot", () => {
     retryBaseDelayMs: 0,
   });
 
-  const buildContainer = () => {
+  const buildContainer = (
+    options: Record<string, unknown> = {
+      publicKey: "pub",
+      privateKey: "priv",
+      defaultFromCountryCode: "FR",
+      webhookSecret: "shh",
+    }
+  ) => {
     const scope: Record<string, unknown> = {
-      [PROVIDER_KEY]: { client_: client },
+      [PROVIDER_KEY]: { client_: client, options_: options },
     };
     return {
       resolve: jest.fn((key: string) => {
@@ -42,7 +49,7 @@ describe("fetchDashboardSnapshot", () => {
     } as unknown as Parameters<typeof fetchDashboardSnapshot>[0];
   };
 
-  it("returns connected + shipping_options on a 200 response", async () => {
+  it("returns connected + shipping_options + empty config_warnings on a 200 response", async () => {
     nock(DEFAULT_SENDCLOUD_BASE_URL)
       .post(SHIPPING_OPTIONS_PATH, {})
       .reply(200, { data: [sampleOption], message: null });
@@ -52,7 +59,27 @@ describe("fetchDashboardSnapshot", () => {
     expect(result).toEqual({
       connected: true,
       shipping_options: [sampleOption],
+      config_warnings: [],
     });
+  });
+
+  it("includes config_warnings when defaultFromCountryCode is missing", async () => {
+    nock(DEFAULT_SENDCLOUD_BASE_URL)
+      .post(SHIPPING_OPTIONS_PATH, {})
+      .reply(200, { data: [], message: null });
+
+    const result = await fetchDashboardSnapshot(
+      buildContainer({
+        publicKey: "pub",
+        privateKey: "priv",
+        webhookSecret: "shh",
+      }),
+      PROVIDER_KEY
+    );
+
+    expect(result.config_warnings).toEqual([
+      expect.objectContaining({ code: "missing_from_country" }),
+    ]);
   });
 
   it("flags credentials errors (401) as disconnected", async () => {

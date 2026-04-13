@@ -1315,6 +1315,145 @@ describe("SendCloudFulfillmentProvider", () => {
         expect(result.labels).toHaveLength(3);
       });
     });
+
+    describe("customs validation warnings (§9.4)", () => {
+      const usAddress = {
+        ...((
+          orderFixture as unknown as {
+            shipping_address: Record<string, unknown>;
+          }
+        ).shipping_address ?? {}),
+        country_code: "US",
+        postal_code: "10001",
+        city: "New York",
+      };
+      const intlFulfillment = {
+        id: "ful_intl_1",
+        delivery_address: usAddress,
+      } as unknown as Parameters<
+        SendCloudFulfillmentProvider["createFulfillment"]
+      >[3];
+      const intlOrder = {
+        ...orderFixture,
+        currency_code: "EUR",
+        shipping_address: usAddress,
+        items: [
+          {
+            id: "li_1",
+            variant_id: "var_1",
+            unit_price: 925,
+            quantity: 2,
+            title: "Bar of Chocolate",
+          },
+        ],
+        metadata: {},
+      } as unknown as Parameters<
+        SendCloudFulfillmentProvider["createFulfillment"]
+      >[2];
+
+      const intlOrderWithCustoms = {
+        ...intlOrder,
+        metadata: {
+          sendcloud_variants: {
+            var_1: { hs_code: "180631", origin_country: "FR" },
+          },
+        },
+      } as unknown as Parameters<
+        SendCloudFulfillmentProvider["createFulfillment"]
+      >[2];
+
+      const intlOrderMissingHs = {
+        ...intlOrder,
+        metadata: {
+          sendcloud_variants: {
+            var_1: { origin_country: "FR" },
+          },
+        },
+      } as unknown as Parameters<
+        SendCloudFulfillmentProvider["createFulfillment"]
+      >[2];
+
+      it("intra-EU shipment with missing hs_code emits no warnings", async () => {
+        nock(BASE).post(SHIPMENTS_PATH).reply(201, shipmentResponse);
+
+        const result = await buildProvider({
+          defaultFromCountryCode: "FR",
+        }).createFulfillment(
+          fulfillmentData,
+          fulfillmentItems,
+          orderFixture,
+          fulfillmentFixture
+        );
+
+        expect(result.data).not.toHaveProperty("sendcloud_warnings");
+      });
+
+      it("FR→US shipment with full customs data emits no warnings", async () => {
+        nock(BASE).post(SHIPMENTS_PATH).reply(201, shipmentResponse);
+
+        const result = await buildProvider({
+          defaultFromCountryCode: "FR",
+        }).createFulfillment(
+          fulfillmentData,
+          fulfillmentItems,
+          intlOrderWithCustoms,
+          intlFulfillment
+        );
+
+        expect(result.data).not.toHaveProperty("sendcloud_warnings");
+      });
+
+      it("FR→US shipment with missing hs_code persists warning + logs warn", async () => {
+        nock(BASE).post(SHIPMENTS_PATH).reply(201, shipmentResponse);
+
+        const warnSpy = jest.fn();
+        const provider = new SendCloudFulfillmentProvider(
+          { logger: { ...noopLogger, warn: warnSpy } as never },
+          {
+            ...validOptions,
+            retryBaseDelayMs: 0,
+            weightUnit: "g",
+            defaultFromCountryCode: "FR",
+          }
+        );
+
+        const result = await provider.createFulfillment(
+          fulfillmentData,
+          fulfillmentItems,
+          intlOrderMissingHs,
+          intlFulfillment
+        );
+
+        const warnings = (
+          result.data as { sendcloud_warnings?: Array<{ code: string }> }
+        ).sendcloud_warnings;
+        expect(warnings).toEqual([
+          expect.objectContaining({ code: "missing_hs_code" }),
+        ]);
+        expect(warnSpy).toHaveBeenCalled();
+      });
+
+      it("skips customs validation when defaultFromCountryCode is unset (US destination)", async () => {
+        nock(BASE).post(SHIPMENTS_PATH).reply(201, shipmentResponse);
+
+        const warnSpy = jest.fn();
+        const provider = new SendCloudFulfillmentProvider(
+          { logger: { ...noopLogger, warn: warnSpy } as never },
+          { ...validOptions, retryBaseDelayMs: 0, weightUnit: "g" }
+          // no defaultFromCountryCode
+        );
+
+        const result = await provider.createFulfillment(
+          fulfillmentData,
+          fulfillmentItems,
+          intlOrderMissingHs,
+          intlFulfillment
+        );
+
+        expect(result.data).not.toHaveProperty("sendcloud_warnings");
+        expect(warnSpy).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe("cancelFulfillment", () => {
@@ -1665,6 +1804,6 @@ describe("SendCloudFulfillmentProvider", () => {
   });
 
   describe("next cycle", () => {
-    it.todo("customs validation warnings — §9.4");
+    it.todo("fulfillment creation widget — §15.3");
   });
 });

@@ -49,9 +49,10 @@ Mounted under Settings via `defineRouteConfig({ label: "SendCloud" })`. File pat
 
 ### Sections
 
-1. **Connection** — green "Connected" badge on success; red "Disconnected" + `error` text otherwise
-2. **Webhook URL** — copyable code block showing `${window.location.origin}/webhooks/sendcloud`. Paste into SendCloud → Settings → Integrations → Webhooks. The plugin verifies HMAC-SHA256 against the configured `webhookSecret` (spec §4, cycle 07)
-3. **Enabled carriers** — grouped table (one sub-heading per carrier) listing shipping-option `code`, `name`, and a "Required" badge on the service-point column when `requirements.is_service_point_required` is true
+1. **Configuration & health** — flags missing plugin options that disable plugin features. Currently checks `defaultFromCountryCode` (disables international customs validation when missing) and `webhookSecret` (causes 401 webhook rejections when missing). Empty + green message when all options are configured. Cycle 14 added this section.
+2. **Connection** — green "Connected" badge on success; red "Disconnected" + `error` text otherwise
+3. **Webhook URL** — copyable code block showing `${window.location.origin}/webhooks/sendcloud`. Paste into SendCloud → Settings → Integrations → Webhooks. The plugin verifies HMAC-SHA256 against the configured `webhookSecret` (spec §4, cycle 07)
+4. **Enabled carriers** — grouped table (one sub-heading per carrier) listing shipping-option `code`, `name`, and a "Required" badge on the service-point column when `requirements.is_service_point_required` is true
 
 Refresh button calls `refetch()` — the `useQuery` retry IS the "test connection" action.
 

@@ -2,11 +2,14 @@ import { MedusaError } from "@medusajs/framework/utils";
 import type { MedusaContainer } from "@medusajs/framework/types";
 
 import type { SendCloudClient } from "../../services/sendcloud-client";
+import type { SendCloudPluginOptions } from "../../types/plugin-options";
 import type {
   SendCloudShippingOption,
   SendCloudShippingOptionsFilter,
   SendCloudShippingOptionsResponse,
 } from "../../types/sendcloud-api";
+
+import { type ConfigWarning, getConfigWarnings } from "./config-health";
 
 export const SHIPPING_OPTIONS_PATH = "/api/v3/shipping-options";
 
@@ -14,10 +17,12 @@ export type DashboardSnapshot = {
   connected: boolean;
   error?: string;
   shipping_options: SendCloudShippingOption[];
+  config_warnings: ConfigWarning[];
 };
 
 type DashboardProvider = {
   client_: SendCloudClient;
+  options_: SendCloudPluginOptions;
 };
 
 const isCredentialsError = (error: MedusaError): boolean =>
@@ -37,8 +42,11 @@ export const fetchDashboardSnapshot = async (
       error:
         "medusa-sendcloud: fulfillment provider not registered in the Medusa container",
       shipping_options: [],
+      config_warnings: [],
     };
   }
+
+  const config_warnings = getConfigWarnings(provider.options_);
 
   try {
     const filter: SendCloudShippingOptionsFilter = {};
@@ -51,6 +59,7 @@ export const fetchDashboardSnapshot = async (
     return {
       connected: true,
       shipping_options: response.data ?? [],
+      config_warnings,
     };
   } catch (error) {
     if (error instanceof MedusaError && isCredentialsError(error)) {
@@ -58,6 +67,7 @@ export const fetchDashboardSnapshot = async (
         connected: false,
         error: `medusa-sendcloud: SendCloud rejected the API credentials (${error.message})`,
         shipping_options: [],
+        config_warnings,
       };
     }
     const message =
@@ -68,6 +78,7 @@ export const fetchDashboardSnapshot = async (
       connected: false,
       error: message,
       shipping_options: [],
+      config_warnings,
     };
   }
 };
