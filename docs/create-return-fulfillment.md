@@ -82,7 +82,7 @@ If `fulfillment.order.metadata.sendcloud_variants` is populated (cycle-05 subscr
 
 - **Single parcel.** If SendCloud returns a non-empty `multi_collo_ids`, we persist it on `fulfillment.data.sendcloud_multi_collo_ids` but only emit one `labels[0]` entry. Multi-collo returns (spec §8) stay a dedicated cycle.
 - **No async creation.** The `/api/v3/returns` (async) endpoint isn't used.
-- **No return cancellation.** `PATCH /api/v3/returns/{id}/cancel` pairs with webhooks in a future cycle. **Current behaviour:** calling `cancelFulfillment` on a return fulfillment throws `MedusaError.Types.NOT_ALLOWED` with a clear message pointing admins to cancel the return manually in the SendCloud dashboard. The outbound-shipment cancel path still works unchanged for non-return fulfillments.
+- **Return cancellation:** implemented in cycle 13 via `PATCH /api/v3/returns/{id}/cancel`. See [return-cancellation.md](./return-cancellation.md). `cancelFulfillment` routes return data (`sendcloud_return_id` present, `sendcloud_shipment_id` absent) to the new helper.
 - **`send_tracking_emails` is hardcoded to `true`.** No plugin option to opt out yet. B2B stores that prefer their own tracking notifications will need a future `sendTrackingEmails` option (parked in NOTES.md).
 - **No return portal.** Spec §7.1 approach A (SendCloud-hosted) is a separate integration surface.
 - **No rule-based label sizes or format.** Label is always fetched as A6 PDF at the default URL.

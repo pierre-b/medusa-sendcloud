@@ -349,6 +349,17 @@ export type SendCloudReturnResponse = {
   multi_collo_ids: number[];
 };
 
+export type SendCloudReturnCancelResponse = {
+  message: string;
+};
+
+export type SendCloudReturnDetailsResponse = {
+  data: {
+    id: number;
+    parent_status?: string | null;
+  };
+};
+
 export type SendCloudVariantCustomsEntry = {
   hs_code?: string;
   origin_country?: string;

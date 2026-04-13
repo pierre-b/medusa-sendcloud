@@ -50,6 +50,26 @@ SendCloud quotes in EUR by default (and the shipping-options snapshot only lists
 
 ---
 
+## Added in cycle 13 (return cancellation, 2026-04-13)
+
+### Cancellation is a request, not a guarantee
+
+SendCloud's `PATCH /returns/:id/cancel` returns 202 even when the carrier doesn't support upstream label cancellation — the carrier may still ship the return. Admin needs to confirm via `parent_status` (we surface the immediate value) plus the next webhook update. Documented in `docs/return-cancellation.md`.
+
+### 409 reason extraction is regex-based
+
+The plugin's client wraps non-2xx into MedusaError with the raw upstream body as a string suffix; SendCloud's 409 cancel response carries `errors[0].message` (no `detail` / `title`), so `cancelReturn` regex-matches "Return is not cancellable" out of the wrapped message. If SendCloud changes the wording or adds a structured `detail` field upstream, the match becomes "stale wording" and we fall back to a generic message. A cleaner fix would be teaching `extractFirstError` to also read `message`, but that ripples through other 4xx error surfaces — defer until the client gets a broader cleanup.
+
+### `parent_status` follow-up GET is best-effort
+
+If the GET fails (5xx after retries, network blip), we return `parent_status: null` and the PATCH success message stands. Admin can re-fetch the fulfillment after the next webhook for an updated value. The GET failure is silently swallowed (not logged at WARN level) to avoid noise — revisit if merchants report missing `parent_status` consistently.
+
+### Outbound shipment cancel (cycle 04) unchanged
+
+`cancelFulfillment` only branches on the absence of `sendcloud_shipment_id`. All cycle-04 cancel-shipment behavior (POST `/api/v3/shipments/:id/cancel`, 409 → CONFLICT mapping) stays identical. The two paths share no error handling — they target different upstream endpoints with different semantics.
+
+---
+
 ## Added in cycle 12 (multi-collo shipments, 2026-04-12)
 
 ### Admin trigger is `fulfillment.metadata.sendcloud_parcels`
@@ -220,9 +240,9 @@ Previously parked in cycle 04 and cycle 06. Webhook now populates `fulfillment.d
 
 Response's `multi_collo_ids[]` is persisted on `fulfillment.data.sendcloud_multi_collo_ids` but only the primary `parcel_id` gets a label entry. Multi-collo split / aggregation is still its own cycle (spec §8).
 
-### Return cancellation
+### ~~Return cancellation~~
 
-`PATCH /api/v3/returns/{id}/cancel` not implemented. `cancelFulfillment` detects return data (`sendcloud_return_id` present, `sendcloud_shipment_id` absent) and throws `NOT_ALLOWED` with an actionable message. Real cancellation pairs naturally with the webhook cycle.
+✅ Resolved in cycle 13. `cancelFulfillment` now routes return-shaped data to `cancelReturn(client, id)`, which PATCHes `/api/v3/returns/{id}/cancel` and reads `parent_status` via a follow-up GET. See `docs/return-cancellation.md`.
 
 ### `send_tracking_emails` opt-out
 

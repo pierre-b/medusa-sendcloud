@@ -45,6 +45,7 @@ import {
   type MulticolloParcel,
   assertCarrierSupportsMulticollo,
 } from "./multicollo";
+import { cancelReturn } from "./return-cancel";
 
 type InjectedDependencies = {
   logger: Logger;
@@ -427,10 +428,8 @@ export class SendCloudFulfillmentProvider extends AbstractFulfillmentProviderSer
       data.sendcloud_return_id !== undefined &&
       data.sendcloud_shipment_id === undefined
     ) {
-      throw new MedusaError(
-        MedusaError.Types.NOT_ALLOWED,
-        "medusa-sendcloud: cancellation of return fulfillments via the provider is not supported yet. Cancel the return manually in the SendCloud dashboard until the return-cancellation cycle lands."
-      );
+      const returnId = Number(data.sendcloud_return_id);
+      return cancelReturn(this.client_, returnId);
     }
 
     const shipmentId = requireString(

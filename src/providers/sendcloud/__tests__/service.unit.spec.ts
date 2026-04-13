@@ -1397,15 +1397,27 @@ describe("SendCloudFulfillmentProvider", () => {
       );
     });
 
-    it("surfaces NOT_ALLOWED when called with return fulfillment data", async () => {
-      await expect(
-        buildProvider().cancelFulfillment({
-          sendcloud_return_id: 98765,
-          sendcloud_parcel_id: 12345,
-        })
-      ).rejects.toMatchObject({
-        type: MedusaError.Types.NOT_ALLOWED,
-        message: expect.stringMatching(/return fulfillments/i),
+    it("calls return-cancel and returns sendcloud_return_cancellation when data has only sendcloud_return_id", async () => {
+      nock(BASE)
+        .patch("/api/v3/returns/98765/cancel")
+        .reply(202, { message: "Cancellation requested successfully" });
+
+      nock(BASE)
+        .get("/api/v3/returns/98765")
+        .reply(200, {
+          data: { id: 98765, parent_status: "cancelling-upstream" },
+        });
+
+      const result = await buildProvider().cancelFulfillment({
+        sendcloud_return_id: 98765,
+        sendcloud_parcel_id: 12345,
+      });
+
+      expect(result).toMatchObject({
+        sendcloud_return_cancellation: {
+          message: "Cancellation requested successfully",
+          parent_status: "cancelling-upstream",
+        },
       });
     });
   });
@@ -1653,6 +1665,6 @@ describe("SendCloudFulfillmentProvider", () => {
   });
 
   describe("next cycle", () => {
-    it.todo("return cancellation — §7 (PATCH /api/v3/returns/:id/cancel)");
+    it.todo("customs validation warnings — §9.4");
   });
 });
