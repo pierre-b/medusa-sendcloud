@@ -50,6 +50,38 @@ SendCloud quotes in EUR by default (and the shipping-options snapshot only lists
 
 ---
 
+## Added in cycle 15 (fulfillment creation widget, 2026-04-13)
+
+### Widget submits to standard `/admin/orders/:id/fulfillments`
+
+No new admin route. The widget builds the metadata payload and calls `sdk.admin.order.createFulfillment`. Backend triggers (cycles 12 + 15) read `fulfillment.metadata.sendcloud_parcels` + `fulfillment.metadata.sendcloud_insurance_amount`. Trade-off: admins can also use Medusa's standard "Create fulfillment" button — but they'd need to type metadata as raw JSON via the standard dialog's free-form metadata field. Document the widget as the recommended path.
+
+### Insurance override is per-fulfillment, applies per-parcel
+
+`metadata.sendcloud_insurance_amount` overrides the plugin option for one fulfillment, then propagates to every parcel in multi-collo mode (matching cycle 12's spec interpretation). 3 parcels × override €75 = €225 total coverage. Documented in `fulfillment-widget.md`.
+
+### MVP fulfills all unfulfilled items
+
+No per-item quantity selector. Admin who needs partial fulfillment falls back to Medusa's standard dialog. Acceptable for MVP — most chocolaterie orders are fulfilled in one shot. Add per-item rows when a merchant asks.
+
+### Total weight hint is "best effort" and weightless-variant prone
+
+Widget computes a "total weight ~X" hint by summing `item.variant.weight × quantity`. If the variant has no weight set, the hint reads as 0 — could mislead admin. Acceptable since the parcel weight is admin-input anyway; the hint is just a starting point.
+
+### Service point shown read-only
+
+Admin sees the customer-selected service point (`shipping_methods[0].data.service_point_id`) but cannot change it. Changing service points post-checkout would require a refund flow + new shipping method — out of scope and rarely needed.
+
+### React Query invalidation key
+
+Widget invalidates `["orders", order.id]` on success. Matches the convention Medusa's admin uses internally (verified manually in this cycle). If Medusa changes their query keys in a future version, the page won't auto-refresh after creating a fulfillment — admin has to F5. Low risk; revisit on Medusa upgrade.
+
+### No widget-level integration tests
+
+Same rationale as cycles 11 + 14. Plugin build verifies the admin extension compiles. Manual verification path: `npx medusa plugin:build` + sample app + create a fulfillment with single + multi-parcel inputs + insurance override.
+
+---
+
 ## Added in cycle 14 (customs validation + admin surfaces, 2026-04-13)
 
 ### `defaultFromCountryCode` is the gate for per-fulfillment customs warnings

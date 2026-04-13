@@ -4,7 +4,9 @@ Admins can split a single fulfillment across up to 15 parcels — one shipment, 
 
 ## Admin trigger
 
-`POST /admin/orders/:id/fulfillments` accepts a `metadata` object, which the core workflow persists on the created fulfillment. SendCloud's provider reads `fulfillment.metadata.sendcloud_parcels` from the 4th arg of `createFulfillment`:
+The recommended path is the [fulfillment creation widget (cycle 15)](./fulfillment-widget.md) on the order details page — admins fill the parcels table and click "Create SendCloud fulfillment". The widget submits the same payload described below.
+
+For automation / scripting, `POST /admin/orders/:id/fulfillments` accepts a `metadata` object, which the core workflow persists on the created fulfillment. SendCloud's provider reads `fulfillment.metadata.sendcloud_parcels` from the 4th arg of `createFulfillment`:
 
 ```
 POST /admin/orders/:id/fulfillments

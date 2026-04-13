@@ -1454,6 +1454,175 @@ describe("SendCloudFulfillmentProvider", () => {
         expect(warnSpy).not.toHaveBeenCalled();
       });
     });
+
+    describe("insurance override (metadata.sendcloud_insurance_amount)", () => {
+      const fulfillmentWithInsurance = (amount: unknown) =>
+        ({
+          ...fulfillmentFixture,
+          metadata: { sendcloud_insurance_amount: amount },
+        }) as unknown as Parameters<
+          SendCloudFulfillmentProvider["createFulfillment"]
+        >[3];
+
+      it("uses the override and ignores defaultInsuranceAmount when both are set", async () => {
+        let capturedBody: Record<string, unknown> | undefined;
+        nock(BASE)
+          .post(SHIPMENTS_PATH, (body) => {
+            capturedBody = body as Record<string, unknown>;
+            return true;
+          })
+          .reply(201, shipmentResponse);
+
+        await buildProvider({ defaultInsuranceAmount: 50 }).createFulfillment(
+          fulfillmentData,
+          fulfillmentItems,
+          orderFixture,
+          fulfillmentWithInsurance(100)
+        );
+
+        const parcel = (
+          capturedBody as { parcels: Array<Record<string, unknown>> }
+        ).parcels[0];
+        expect(parcel.additional_insured_price).toEqual({
+          value: "100",
+          currency: "EUR",
+        });
+      });
+
+      it("falls back to defaultInsuranceAmount when no override is set", async () => {
+        let capturedBody: Record<string, unknown> | undefined;
+        nock(BASE)
+          .post(SHIPMENTS_PATH, (body) => {
+            capturedBody = body as Record<string, unknown>;
+            return true;
+          })
+          .reply(201, shipmentResponse);
+
+        await buildProvider({ defaultInsuranceAmount: 50 }).createFulfillment(
+          fulfillmentData,
+          fulfillmentItems,
+          orderFixture,
+          fulfillmentFixture
+        );
+
+        const parcel = (
+          capturedBody as { parcels: Array<Record<string, unknown>> }
+        ).parcels[0];
+        expect(parcel.additional_insured_price).toEqual({
+          value: "50",
+          currency: "EUR",
+        });
+      });
+
+      it("applies override per-parcel in multi-collo mode", async () => {
+        const MULTICOLLO_PATH = "/api/v3/shipping-options";
+        nock(BASE)
+          .post(MULTICOLLO_PATH)
+          .reply(200, {
+            data: [
+              {
+                code: sampleOption.code,
+                name: sampleOption.name,
+                carrier: sampleOption.carrier,
+                functionalities: { multicollo: true },
+                requirements: {
+                  fields: [],
+                  export_documents: false,
+                  is_service_point_required: false,
+                },
+                charging_type: "label_creation",
+              },
+            ],
+          });
+
+        let capturedBody: Record<string, unknown> | undefined;
+        nock(BASE)
+          .post(SHIPMENTS_PATH, (body) => {
+            capturedBody = body as Record<string, unknown>;
+            return true;
+          })
+          .reply(201, {
+            data: {
+              id: "ship_multi_ins",
+              parcels: [
+                {
+                  id: 900001,
+                  status: { code: "READY_TO_SEND", message: "Ready" },
+                  documents: [],
+                  tracking_number: "T1",
+                  tracking_url: "u1",
+                  announced_at: null,
+                },
+                {
+                  id: 900002,
+                  status: { code: "READY_TO_SEND", message: "Ready" },
+                  documents: [],
+                  tracking_number: "T2",
+                  tracking_url: "u2",
+                  announced_at: null,
+                },
+              ],
+              applied_shipping_rules: [],
+            },
+          });
+
+        const fulfillment = {
+          ...fulfillmentFixture,
+          metadata: {
+            sendcloud_insurance_amount: 75,
+            sendcloud_parcels: [
+              { weight: 1500, length: 30, width: 20, height: 10 },
+              { weight: 900, length: 20, width: 15, height: 8 },
+            ],
+          },
+        } as unknown as Parameters<
+          SendCloudFulfillmentProvider["createFulfillment"]
+        >[3];
+
+        await buildProvider({ defaultInsuranceAmount: 50 }).createFulfillment(
+          fulfillmentData,
+          fulfillmentItems,
+          orderFixture,
+          fulfillment
+        );
+
+        const parcels = (
+          capturedBody as { parcels: Array<Record<string, unknown>> }
+        ).parcels;
+        expect(parcels).toHaveLength(2);
+        for (const parcel of parcels) {
+          expect(parcel.additional_insured_price).toEqual({
+            value: "75",
+            currency: "EUR",
+          });
+        }
+      });
+
+      it("throws INVALID_DATA on negative or non-numeric override", async () => {
+        await expect(
+          buildProvider().createFulfillment(
+            fulfillmentData,
+            fulfillmentItems,
+            orderFixture,
+            fulfillmentWithInsurance(-1)
+          )
+        ).rejects.toMatchObject({
+          type: MedusaError.Types.INVALID_DATA,
+          message: expect.stringMatching(/sendcloud_insurance_amount/),
+        });
+
+        await expect(
+          buildProvider().createFulfillment(
+            fulfillmentData,
+            fulfillmentItems,
+            orderFixture,
+            fulfillmentWithInsurance("not-a-number")
+          )
+        ).rejects.toMatchObject({
+          type: MedusaError.Types.INVALID_DATA,
+        });
+      });
+    });
   });
 
   describe("cancelFulfillment", () => {
@@ -1804,6 +1973,6 @@ describe("SendCloudFulfillmentProvider", () => {
   });
 
   describe("next cycle", () => {
-    it.todo("fulfillment creation widget — §15.3");
+    it.todo("ZPL / PNG label format options — §6");
   });
 });

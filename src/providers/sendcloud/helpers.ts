@@ -548,6 +548,21 @@ export const buildParcelFromHint = (
   return parcel;
 };
 
+export const readInsuranceOverride = (
+  metadata: Record<string, unknown> | null | undefined
+): number | null => {
+  const raw = metadata?.sendcloud_insurance_amount;
+  if (raw === undefined || raw === null) return null;
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value < 0) {
+    throw new MedusaError(
+      MedusaError.Types.INVALID_DATA,
+      `medusa-sendcloud: sendcloud_insurance_amount must be a non-negative number (received ${String(raw)})`
+    );
+  }
+  return value;
+};
+
 export const aggregateParcel = (
   items: CalculateShippingOptionPriceDTO["context"]["items"] | undefined,
   weightUnit: SendCloudWeightUnitOption

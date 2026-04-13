@@ -37,6 +37,7 @@ import {
   buildToAddress,
   isValidServicePointId,
   parseParcelsHint,
+  readInsuranceOverride,
   readSendCloudCode,
   readSendcloudVariantsFromOrder,
   requireString,
@@ -221,11 +222,17 @@ export class SendCloudFulfillmentProvider extends AbstractFulfillmentProviderSer
       await assertCarrierSupportsMulticollo(this.client_, code);
     }
 
+    const insuranceOverride = readInsuranceOverride(
+      fulfillment?.metadata as Record<string, unknown> | undefined
+    );
+    const effectiveInsurance =
+      insuranceOverride ?? this.options_.defaultInsuranceAmount;
+
     const primaryParcel = buildShipmentParcel(
       items as FulfillmentItemDTO[] | undefined,
       order,
       {
-        insuranceAmount: this.options_.defaultInsuranceAmount,
+        insuranceAmount: effectiveInsurance,
         variantsMap: readSendcloudVariantsFromOrder(order),
         weightUnit,
       }
@@ -237,11 +244,7 @@ export class SendCloudFulfillmentProvider extends AbstractFulfillmentProviderSer
           ...parcelsHint
             .slice(1)
             .map((hint) =>
-              buildParcelFromHint(
-                hint,
-                weightUnit,
-                this.options_.defaultInsuranceAmount
-              )
+              buildParcelFromHint(hint, weightUnit, effectiveInsurance)
             ),
         ]
       : [primaryParcel];

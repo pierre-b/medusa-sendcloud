@@ -20,6 +20,7 @@ Each feature landed in this plugin gets its own page here. The index is the auth
 - [Multi-collo shipments (§8)](./multi-collo.md) — admin-specified per-parcel split via `fulfillment.metadata.sendcloud_parcels`, with carrier pre-validation and webhook-driven status aggregation
 - [Return cancellation (§7.4)](./return-cancellation.md) — `PATCH /api/v3/returns/:id/cancel` routed through Medusa's standard cancel-fulfillment flow, with `parent_status` follow-up read
 - [Customs validation warnings (§9.4)](./customs-validation.md) — auto-detect EU vs non-EU, persist warnings on `fulfillment.data.sendcloud_warnings`, surface in admin settings + order detail widget
+- [Fulfillment creation widget (§15.3)](./fulfillment-widget.md) — admin form on order details for parcel split + service-point display + per-shipment insurance override; backed by new `metadata.sendcloud_insurance_amount`
 
 ## OpenAPI snapshots
 
@@ -47,7 +48,8 @@ Vendor-authoritative copies of the SendCloud v3 specs the plugin relies on. Kept
 - [`plans/12-multi-collo.md`](./plans/12-multi-collo.md) — cycle 12: multi-collo shipments + webhook aggregation
 - [`plans/13-return-cancellation.md`](./plans/13-return-cancellation.md) — cycle 13: return cancellation via PATCH /returns/:id/cancel
 - [`plans/14-customs-validation.md`](./plans/14-customs-validation.md) — cycle 14: customs validation + admin warning surfaces
+- [`plans/15-fulfillment-widget.md`](./plans/15-fulfillment-widget.md) — cycle 15: fulfillment creation widget + insurance override
 
 ## Roadmap
 
-See `../../chocolaterie/docs/medusa-sendcloud-plugin-spec.md` §19 for the full feature checklist (P0 → P3). P0 complete; P1 progressing (service points ✅, bulk labels ✅, single label ✅, admin settings widget ✅, multi-collo ✅, return cancellation ✅, customs warnings ✅). Next: fulfillment creation widget (§15.3), order detail widget (§15.2 — partial done), or ZPL/PNG format variants.
+See `../../chocolaterie/docs/medusa-sendcloud-plugin-spec.md` §19 for the full feature checklist (P0 → P3). P0 complete; P1 progressing (service points ✅, bulk labels ✅, single label ✅, admin settings widget ✅, multi-collo ✅, return cancellation ✅, customs warnings ✅, fulfillment widget ✅). Next: ZPL/PNG label format variants, order detail tracking widget (rest of §15.2), or sender address override.

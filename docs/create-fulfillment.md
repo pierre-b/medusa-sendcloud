@@ -88,10 +88,10 @@ International non-EU shipments that need `hs_code` / `origin_country` / per-item
 
 ## Plugin options
 
-| Option                   | Default              | Role                                         |
-| ------------------------ | -------------------- | -------------------------------------------- |
-| `defaultExportReason`    | `"commercial_goods"` | Customs export_reason enum                   |
-| `defaultInsuranceAmount` | _none_               | Per-parcel `additional_insured_price` in EUR |
+| Option                   | Default              | Role                                                                                                                            |
+| ------------------------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `defaultExportReason`    | `"commercial_goods"` | Customs export_reason enum                                                                                                      |
+| `defaultInsuranceAmount` | _none_               | Per-parcel `additional_insured_price` in EUR (overridable per-fulfillment via `metadata.sendcloud_insurance_amount` — cycle 15) |
 
 ## Error handling
 
